@@ -111,6 +111,7 @@ function(sbom_generate)
 	    SUPPLIER
 	    SUPPLIER_URL
 	    NAMESPACE
+		BSI_COMPLIANT
 	)
 	set(multiValueArgs INPUT)
 	cmake_parse_arguments(
@@ -174,6 +175,12 @@ function(sbom_generate)
 		set(SBOM_GENERATE_NAMESPACE
 		    "${SBOM_GENERATE_SUPPLIER_URL}/spdxdocs/${PROJECT_NAME}-${GIT_VERSION}"
 		)
+	endif()
+
+	if(${SBOM_GENERATE_BSI_COMPLIANT})
+		set(SBOM_BSI_COMPLIANCE OFF CACHE BOOL "Generated SBOM has to be BSI-COMPLIANT")
+	else()
+		set(SBOM_BSI_COMPLIANCE ON CACHE BOOL "Generated SBOM has to be BSI-COMPLIANT")
 	endif()
 
 	string(REGEX REPLACE "[^A-Za-z0-9.]+" "-" SBOM_GENERATE_PROJECT "${SBOM_GENERATE_PROJECT}")
@@ -708,10 +715,16 @@ function(sbom_package)
 
 	if("${SBOM_PACKAGE_VERSION}" STREQUAL "")
 		set(SBOM_PACKAGE_VERSION "unknown")
+		if(${SBOM_BSI_COMPLIANCE})
+			message(WARNING "  BSI_COMPLIANCE: Version required for <${SBOM_PACKAGE_PACKAGE}>. SemVer/commit-hash")
+		endif()
 	endif()
 
 	if("${SBOM_PACKAGE_SUPPLIER}" STREQUAL "")
 		set(SBOM_PACKAGE_SUPPLIER "Person: Anonymous")
+		if(${SBOM_BSI_COMPLIANCE})
+			message(WARNING "  BSI_COMPLIANCE: Supplier required for <${SBOM_PACKAGE_PACKAGE}>. Person/Organization: name (email/url)")
+		endif()
 	endif()
 
 	if(NOT "${SBOM_PACKAGE_LICENSE}" STREQUAL "")
@@ -722,6 +735,9 @@ PackageLicenseConcluded: ${SBOM_PACKAGE_LICENSE}"
 		set(_fields "${_fields}
 PackageLicenseConcluded: NOASSERTION"
 		)
+		if(${SBOM_BSI_COMPLIANCE})
+			message(WARNING "  BSI_COMPLIANCE: LICENSE required for <${SBOM_PACKAGE_PACKAGE}>. SPDX license identifier.")
+		endif()
 	endif()
 
 	foreach(_ref IN LISTS SBOM_PACKAGE_EXTREF)
