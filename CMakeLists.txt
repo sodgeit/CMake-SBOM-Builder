@@ -14,7 +14,5 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 include(sbom)
 
-reuse_lint()
-
 add_subdirectory(example)
 add_subdirectory(test)

@@ -45,12 +45,6 @@ sbom_generate(
 	SUPPLIER_URL https://demcon.com
 )
 
-# If you want to check REUSE compliance.
-reuse_lint()
-
-# If you want to generate a SPDX file with the license information of the source code.
-reuse_spdx()
-
 # ##################################################################################################
 # Example binary
 

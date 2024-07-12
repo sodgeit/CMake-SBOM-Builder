@@ -111,6 +111,7 @@ function(sbom_generate)
 	    SUPPLIER
 	    SUPPLIER_URL
 	    NAMESPACE
+		ENABLE_CHECKS
 	)
 	set(multiValueArgs INPUT)
 	cmake_parse_arguments(
@@ -158,22 +159,14 @@ function(sbom_generate)
 		set(SBOM_GENERATE_COPYRIGHT "${NOW_YEAR} ${SBOM_GENERATE_SUPPLIER}")
 	endif()
 
-	if("${SBOM_GENERATE_SUPPLIER_URL}" STREQUAL "")
-		set(SBOM_GENERATE_SUPPLIER_URL "${SBOM_SUPPLIER_URL}")
-		if("${SBOM_GENERATE_SUPPLIER_URL}" STREQUAL "")
-			set(SBOM_GENERATE_SUPPLIER_URL "${PROJECT_HOMEPAGE_URL}")
-		endif()
-	elseif("${SBOM_SUPPLIER_URL}" STREQUAL "")
-		set(SBOM_SUPPLIER_URL
-		    "${SBOM_GENERATE_SUPPLIER_URL}"
-		    CACHE STRING "SBOM supplier URL"
-		)
+	if(NOT DEFINED SBOM_GENERATE_NAMESPACE)
+		set(SBOM_GENERATE_NAMESPACE "${SBOM_GENERATE_SUPPLIER_URL}/spdxdocs/${PROJECT_NAME}-${GIT_VERSION}")
 	endif()
 
-	if("${SBOM_GENERATE_NAMESPACE}" STREQUAL "")
-		set(SBOM_GENERATE_NAMESPACE
-		    "${SBOM_GENERATE_SUPPLIER_URL}/spdxdocs/${PROJECT_NAME}-${GIT_VERSION}"
-		)
+	if(${SBOM_GENERATE_ENABLE_CHECKS})
+		set(SBOM_CHECKS_ENABLED ON CACHE BOOL "Warn on important missing fields.")
+	else()
+		set(SBOM_CHECKS_ENABLED OFF CACHE BOOL "Warn on important missing fields.")
 	endif()
 
 	string(REGEX REPLACE "[^A-Za-z0-9.]+" "-" SBOM_GENERATE_PROJECT "${SBOM_GENERATE_PROJECT}")
@@ -305,72 +298,8 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PROJECT}
 	file(WRITE ${PROJECT_BINARY_DIR}/sbom/CMakeLists.txt "")
 endfunction()
 
-# Find python.
-#
-# Usage sbom_find_python([REQUIRED])
-macro(sbom_find_python)
-	if(Python3_EXECUTABLE)
-		set(Python3_FOUND TRUE)
-	elseif(NOT CMAKE_VERSION VERSION_LESS 3.12)
-		find_package(Python3 COMPONENTS Interpreter ${ARGV})
-	else()
-		if(WIN32)
-			find_program(Python3_EXECUTABLE NAMES python ${ARGV})
-		else()
-			find_program(Python3_EXECUTABLE NAMES python3 ${ARGV})
-		endif()
-
-		if(Python3_EXECUTABLE)
-			set(Python3_FOUND TRUE)
-		else()
-			set(Python3_FOUND FALSE)
-		endif()
-	endif()
-
-	if(Python3_FOUND)
-		if(NOT DEFINED SBOM_HAVE_PYTHON_DEPS)
-			execute_process(
-				COMMAND
-					${Python3_EXECUTABLE} -c "
-import reuse
-import spdx_tools.spdx.clitools.pyspdxtools
-import ntia_conformance_checker.main
-"
-				RESULT_VARIABLE _res
-				ERROR_QUIET OUTPUT_QUIET
-			)
-
-			if("${_res}" STREQUAL "0")
-				set(SBOM_HAVE_PYTHON_DEPS
-				    TRUE
-				    CACHE INTERNAL ""
-				)
-			else()
-				set(SBOM_HAVE_PYTHON_DEPS
-				    FALSE
-				    CACHE INTERNAL ""
-				)
-			endif()
-		endif()
-
-		if("${ARGN}" STREQUAL "REQUIRED" AND NOT SBOM_HAVE_PYTHON_DEPS)
-			message(FATAL_ERROR "Missing python packages")
-		endif()
-	endif()
-endmacro()
-
-# Verify the generated SBOM. Call after sbom_generate() and other SBOM populating commands.
+# Finalize the generated SBOM. Call after sbom_generate() and other SBOM populating commands.
 function(sbom_finalize)
-	set(options NO_VERIFY VERIFY)
-	set(oneValueArgs GRAPH)
-	set(multiValueArgs)
-	cmake_parse_arguments(
-		SBOM_FINALIZE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
-	)
-	if(SBOM_FINALIZE_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${SBOM_FINALIZE_UNPARSED_ARGUMENTS}")
-	endif()
-
 	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
 	get_property(_sbom_project GLOBAL PROPERTY sbom_project)
 
@@ -379,7 +308,7 @@ function(sbom_finalize)
 	endif()
 
 	file(
-		WRITE ${PROJECT_BINARY_DIR}/sbom/verify.cmake
+		WRITE ${PROJECT_BINARY_DIR}/sbom/finalize.cmake
 		"
 		message(STATUS \"Finalizing: ${_sbom}\")
 		list(SORT SBOM_VERIFICATION_CODES)
@@ -390,59 +319,7 @@ function(sbom_finalize)
 		"
 	)
 
-	if(NOT "${SBOM_FINALIZE_GRAPH}" STREQUAL "")
-		set(SBOM_FINALIZE_NO_VERIFY FALSE)
-		set(SBOM_FINALIZE_VERIFY TRUE)
-		set(_graph --graph --outfile "${SBOM_FINALIZE_GRAPH}")
-	else()
-		set(_graph)
-	endif()
-
-	if(SBOM_FINALIZE_NO_VERIFY)
-		set(SBOM_FINALIZE_VERIFY FALSE)
-	else()
-		if(SBOM_FINALIZE_VERIFY)
-			# Force verify.
-			set(_req REQUIRED)
-		else()
-			# Check if we can verify.
-			set(_req)
-		endif()
-
-		sbom_find_python(${_req})
-
-		if(Python3_FOUND)
-			set(SBOM_FINALIZE_VERIFY TRUE)
-		endif()
-	endif()
-
-	if(SBOM_FINALIZE_VERIFY)
-		file(
-			APPEND ${PROJECT_BINARY_DIR}/sbom/verify.cmake
-			"
-			message(STATUS \"Verifying: ${_sbom}\")
-			execute_process(
-				COMMAND ${Python3_EXECUTABLE} -m spdx_tools.spdx.clitools.pyspdxtools
-				-i \"${_sbom}\" ${_graph}
-				RESULT_VARIABLE _res
-			)
-			if(NOT _res EQUAL 0)
-				message(FATAL_ERROR \"SBOM verification failed\")
-			endif()
-
-			execute_process(
-				COMMAND ${Python3_EXECUTABLE} -m ntia_conformance_checker.main
-				--file \"${_sbom}\"
-				RESULT_VARIABLE _res
-			)
-			if(NOT _res EQUAL 0)
-				message(FATAL_ERROR \"SBOM NTIA verification failed\")
-			endif()
-			"
-		)
-	endif()
-
-	file(APPEND ${PROJECT_BINARY_DIR}/sbom/CMakeLists.txt "install(SCRIPT verify.cmake)
+	file(APPEND ${PROJECT_BINARY_DIR}/sbom/CMakeLists.txt "install(SCRIPT finalize.cmake)
 "
 	)
 
@@ -708,10 +585,18 @@ function(sbom_package)
 
 	if("${SBOM_PACKAGE_VERSION}" STREQUAL "")
 		set(SBOM_PACKAGE_VERSION "unknown")
+
+		if(${SBOM_CHECKS_ENABLED})
+			message(WARNING "Version missing for package: ${SBOM_PACKAGE_PACKAGE}. (semver/commit-hash)")
+		endif()
 	endif()
 
 	if("${SBOM_PACKAGE_SUPPLIER}" STREQUAL "")
 		set(SBOM_PACKAGE_SUPPLIER "Person: Anonymous")
+
+		if(${SBOM_CHECKS_ENABLED})
+			message(WARNING "Supplier missing for package: ${SBOM_PACKAGE_PACKAGE}. (Person/Organization + email/url)")
+		endif()
 	endif()
 
 	if(NOT "${SBOM_PACKAGE_LICENSE}" STREQUAL "")
@@ -722,6 +607,10 @@ PackageLicenseConcluded: ${SBOM_PACKAGE_LICENSE}"
 		set(_fields "${_fields}
 PackageLicenseConcluded: NOASSERTION"
 		)
+
+		if(${SBOM_CHECKS_ENABLED})
+			message(WARNING "LICENSE missing for package ${SBOM_PACKAGE_PACKAGE}. (SPDX license identifier)")
+		endif()
 	endif()
 
 	foreach(_ref IN LISTS SBOM_PACKAGE_EXTREF)
@@ -889,37 +778,4 @@ function(sbom_add type)
 	    "${SBOM_LAST_SPDXID}"
 	    PARENT_SCOPE
 	)
-endfunction()
-
-# Adds a target that performs `python3 -m reuse lint'.  Python is required with the proper packages
-# installed (see dist/common/requirements.txt).
-function(reuse_lint)
-	if(NOT TARGET ${PROJECT_NAME}-reuse-lint)
-		sbom_find_python(REQUIRED)
-
-		add_custom_target(
-			${PROJECT_NAME}-reuse-lint ALL
-			COMMAND ${Python3_EXECUTABLE} -m reuse --root "${PROJECT_SOURCE_DIR}" lint
-			WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-			VERBATIM
-		)
-	endif()
-endfunction()
-
-# Adds a target that generates a SPDX file of the source code.  Python is required with the proper
-# packages installed (see dist/common/requirements.txt).
-function(reuse_spdx)
-	if(NOT TARGET ${PROJECT_NAME}-reuse-spdx)
-		sbom_find_python(REQUIRED)
-
-		set(outfile "${PROJECT_BINARY_DIR}/${PROJECT_NAME}-src.spdx")
-
-		add_custom_target(
-			${PROJECT_NAME}-reuse-spdx ALL
-			COMMAND ${Python3_EXECUTABLE} -m reuse --root "${PROJECT_SOURCE_DIR}" spdx
-				-o "${outfile}"
-			WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-			VERBATIM
-		)
-	endif()
 endfunction()

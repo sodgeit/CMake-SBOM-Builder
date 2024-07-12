@@ -10,8 +10,6 @@ endif()
 
 add_custom_target(tests ALL)
 
-sbom_find_python(REQUIRED)
-
 function(test name)
 	set(_dir "${CMAKE_CURRENT_BINARY_DIR}/${name}")
 	make_directory(${_dir}/src)
@@ -32,7 +30,6 @@ project(${name})"
 			${CMAKE_COMMAND} "${_dir}/src" -G "${CMAKE_GENERATOR}"
 			"-DCMAKE_INSTALL_PREFIX=${_dir}/out"
 			"-DCMAKE_MODULE_PATH=${PROJECT_SOURCE_DIR}/cmake"
-			"-DPython3_EXECUTABLE=${Python3_EXECUTABLE}"
 			"-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
 		COMMAND ${CMAKE_COMMAND} --build . --target install
 		WORKING_DIRECTORY "${_dir}/build"
