@@ -6,7 +6,7 @@
 
 include(sbom)
 
-sbom_generate(SUPPLIER Demcon SUPPLIER_URL https://demcon.com)
+sbom_generate(SUPPLIER DirectoryTest SUPPLIER_URL https://directoryTest.com)
 
 install(FILES ${CMAKE_CURRENT_LIST_FILE} DESTINATION dir)
 install(FILES ${CMAKE_CURRENT_LIST_FILE} DESTINATION dir RENAME file.txt)

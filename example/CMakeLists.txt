@@ -31,18 +31,17 @@ endif()
 # ##################################################################################################
 # SBOM setup
 
-# Include and generation version information.
-include(version)
-
 include(sbom)
+
+version_extract()
 
 # Setup the SBOM to be generated during install.
 sbom_generate(
 	OUTPUT
 		${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATAROOTDIR}/example/sbom-${GIT_VERSION_PATH}.spdx
 	LICENSE CC0-1.0
-	SUPPLIER Demcon
-	SUPPLIER_URL https://demcon.com
+	SUPPLIER Example
+	SUPPLIER_URL https://example_company.com
 )
 
 # ##################################################################################################
@@ -50,6 +49,7 @@ sbom_generate(
 
 # We now have set GIT_VERSION and friends set to the current project's version.  We also have a
 # version static library, version.sh and version.txt for further processing.
+version_generate()
 
 add_executable(example example.cpp)
 target_link_libraries(example example-project-version)

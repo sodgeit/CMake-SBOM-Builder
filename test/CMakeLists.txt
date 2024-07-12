@@ -16,8 +16,7 @@ function(test name)
 	make_directory(${_dir}/build)
 
 	set(TEST_PREAMBLE
-	    "cmake_minimum_required(VERSION 3.5)
-cmake_policy(VERSION 3.5)
+	    "cmake_minimum_required(VERSION 3.14)
 project(${name})"
 	)
 

@@ -5,8 +5,8 @@
 @TEST_PREAMBLE@
 
 include(sbom)
-set(SBOM_SUPPLIER Demcon)
-set(SBOM_SUPPLIER_URL https://demcon.com)
+set(SBOM_SUPPLIER ExternalTest)
+set(SBOM_SUPPLIER_URL https://externalTest.com)
 
 make_directory(${CMAKE_CURRENT_BINARY_DIR}/other)
 file(
@@ -25,7 +25,7 @@ get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
 sbom_generate()
 sbom_add(EXTERNAL SPDXRef-other FILENAME "${_sbom}")
 
-sbom_external(
+sbom_add(
 	EXTERNAL SPDXRef-other
 	FILENAME "${_sbom}"
 	RELATIONSHIP "\@SBOM_LAST_SPDXID\@:SPDXRef-other VARIANT_OF ${SBOM_LAST_SPDXID}:SPDXRef-other"
