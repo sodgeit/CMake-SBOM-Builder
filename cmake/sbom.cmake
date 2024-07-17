@@ -470,8 +470,7 @@ DocumentName: ${doc_name}
 DocumentNamespace: ${SBOM_GENERATE_NAMESPACE}
 Creator: Organization: ${SBOM_GENERATE_SUPPLIER}
 Creator: Tool: cmake-sbom
-CreatorComment: <text>This SPDX document was created from CMake ${CMAKE_VERSION}, using cmake-sbom
-from https://github.com/DEMCON/cmake-sbom</text>
+CreatorComment: <text>This SPDX document was created from CMake ${CMAKE_VERSION}, using CMake-SBOM-Builder from https://github.com/sodgeit/CMake-SBOM-Builder</text>
 Created: ${NOW_UTC}\${SBOM_EXT_DOCS}
 
 PackageName: ${CMAKE_CXX_COMPILER_ID}

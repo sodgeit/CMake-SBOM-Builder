@@ -9,7 +9,7 @@ It automates two tasks:
 
 The version extraction helps to get the version in the application and SBOM right. The SBOM contains the files you mention explicitly, just like you mention what to `install()` in CMake.
 
-To integrate this library in your project, see [below](#how-to-use) for basic instructions or the [example](https://github.com/DEMCON/cmake-sbom/tree/main/example) for a complete example project.
+To integrate this library in your project, see [below](#how-to-use) for basic instructions or the example for a simple example project.
 
 [SPDX](https://spdx.github.io/spdx-spec/v2.3/)
 [NTIA](http://ntia.gov/SBOM)
