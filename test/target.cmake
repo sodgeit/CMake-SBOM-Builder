@@ -6,7 +6,7 @@
 
 include(sbom)
 
-sbom_generate(SUPPLIER Demcon SUPPLIER_URL https://demcon.com)
+sbom_generate(SUPPLIER target_test SUPPLIER_URL https://target_test.com)
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/foo.c "int main() {}")
 

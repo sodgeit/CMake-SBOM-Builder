@@ -6,8 +6,8 @@
 
 include(sbom)
 
-set(SBOM_SUPPLIER Demcon)
-set(SBOM_SUPPLIER_URL https://demcon.com)
+set(SBOM_SUPPLIER minimal_test)
+set(SBOM_SUPPLIER_URL https://minimal_test.com)
 
 sbom_generate()
 sbom_finalize()

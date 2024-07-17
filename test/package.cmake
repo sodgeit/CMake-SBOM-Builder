@@ -6,7 +6,7 @@
 
 include(sbom)
 
-sbom_generate(SUPPLIER Demcon SUPPLIER_URL https://demcon.com)
+sbom_generate(SUPPLIER package_test SUPPLIER_URL https://package_test.com)
 
 sbom_add(PACKAGE foo)
 sbom_add(PACKAGE foo DOWNLOAD_LOCATION http://foo.bar/baz)
@@ -18,4 +18,4 @@ sbom_add(
 	VERSION 0.1
 )
 
-sbom_finalize(VERIFY)
+sbom_finalize()

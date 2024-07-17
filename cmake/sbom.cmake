@@ -1,13 +1,277 @@
-# SPDX-FileCopyrightText: 2023-2024 Jochem Rutgers
-#
-# SPDX-License-Identifier: MIT
+cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
+# catch and stop second call to this function
 if(COMMAND sbom_generate)
 	return()
 endif()
 
 include(GNUInstallDirs)
-include(${CMAKE_CURRENT_LIST_DIR}/version.cmake)
+
+set(VERSION_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}" CACHE INTERNAL "")
+
+find_package(Git)
+
+function(version_show)
+	message(STATUS "${PROJECT_NAME} version is ${GIT_VERSION}")
+endfunction()
+
+# Extract version information from Git of the current project.
+function(version_extract)
+	set(options VERBOSE)
+	cmake_parse_arguments(
+		VERSION_EXTRACT "${options}" "" "" ${ARGN}
+	)
+
+	if(DEFINED GIT_VERSION)
+		return()
+	endif()
+
+	set(version_git_head "unknown")
+	set(version_git_hash "")
+	set(version_git_branch "dev")
+	set(version_git_tag "")
+
+	if(Git_FOUND)
+		execute_process(
+			COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+			OUTPUT_VARIABLE version_git_head
+			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
+		)
+
+		execute_process(
+			COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+			OUTPUT_VARIABLE version_git_hash
+			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
+		)
+
+		execute_process(
+			COMMAND ${GIT_EXECUTABLE} rev-parse --abbrev-ref HEAD
+			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+			OUTPUT_VARIABLE version_git_branch
+			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
+		)
+
+		if("${version_git_branch}" STREQUAL "HEAD")
+			if(NOT "$ENV{CI_COMMIT_BRANCH}" STREQUAL "")
+				# Probably a detached head running on a gitlab runner
+				set(version_git_branch "$ENV{CI_COMMIT_BRANCH}")
+			endif()
+		endif()
+
+		execute_process(
+			COMMAND ${GIT_EXECUTABLE} tag --points-at HEAD
+			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+			OUTPUT_VARIABLE version_git_tag
+			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
+		)
+
+		string(REGEX REPLACE "[ \t\r\n].*$" "" version_git_tag "${version_git_tag}")
+
+		if("${version_git_tag}" STREQUAL "")
+			if(NOT "$ENV{CI_COMMIT_TAG}" STREQUAL "")
+				# Probably a detached head running on a gitlab runner
+				set(version_git_tag "$ENV{CI_COMMIT_TAG}")
+			endif()
+		endif()
+
+		execute_process(
+			COMMAND ${GIT_EXECUTABLE} status -s
+			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+			OUTPUT_VARIABLE version_git_dirty
+			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
+		)
+
+		if(NOT "${version_git_dirty}" STREQUAL "")
+			set(version_git_dirty "+dirty")
+		endif()
+
+		macro(git_hash TAG TAG_VAR)
+			execute_process(
+				COMMAND ${GIT_EXECUTABLE} rev-parse ${TAG}
+				WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+				OUTPUT_VARIABLE ${TAG_VAR}_
+				ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
+			)
+
+			set(${TAG_VAR} "${${TAG_VAR}_}" PARENT_SCOPE)
+		endmacro()
+
+		execute_process(
+			COMMAND ${GIT_EXECUTABLE} tag
+			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+			OUTPUT_VARIABLE GIT_TAGS
+			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
+		)
+
+		if(GIT_TAGS)
+			string(REGEX REPLACE "[ \t\r\n]+" ";" GIT_TAGS_LIST ${GIT_TAGS})
+
+			foreach(tag IN LISTS GIT_TAGS_LIST)
+				git_hash(${tag} GIT_HASH_${tag})
+
+				if(VERSION_EXTRACT_VERBOSE)
+					message(STATUS "git hash of tag ${tag} is ${GIT_HASH_${tag}}")
+				endif()
+			endforeach()
+		endif()
+	else()
+		message(WARNING "Git not found")
+	endif()
+
+	if("$ENV{CI_BUILD_ID}" STREQUAL "")
+		set(version_build "")
+	else()
+		set(version_build "+build$ENV{CI_BUILD_ID}")
+	endif()
+
+	set(GIT_HASH "${version_git_hash}" PARENT_SCOPE)
+	set(GIT_HASH_SHORT "${version_git_head}" PARENT_SCOPE)
+
+	if(NOT ${version_git_tag} STREQUAL "")
+		set(_GIT_VERSION "${version_git_tag}")
+
+		if("${_GIT_VERSION}" MATCHES "^v[0-9]+\.")
+			string(REGEX REPLACE "^v" "" _GIT_VERSION "${_GIT_VERSION}")
+		endif()
+
+		set(GIT_VERSION "${_GIT_VERSION}${version_git_dirty}")
+	else()
+		set(GIT_VERSION
+			"${version_git_head}+${version_git_branch}${version_build}${version_git_dirty}"
+		)
+	endif()
+
+	set(GIT_VERSION "${GIT_VERSION}" PARENT_SCOPE)
+	string(REGEX REPLACE "[^-a-zA-Z0-9_.]+" "+" _GIT_VERSION_PATH "${GIT_VERSION}")
+	set(GIT_VERSION_PATH "${_GIT_VERSION_PATH}" PARENT_SCOPE)
+
+	if(VERSION_EXTRACT_VERBOSE)
+		version_show()
+	endif()
+endfunction()
+
+# Generate version files and a static library based on the extract version information of the
+# current project.
+function(version_generate)
+	if(NOT DEFINED ${GIT_VERSION})
+		version_extract()
+	endif()
+
+	string(TIMESTAMP VERSION_TIMESTAMP "%Y-%m-%d %H:%M:%S")
+	set(VERSION_TIMESTAMP "${VERSION_TIMESTAMP}")
+	set(VERSION_TIMESTAMP
+		"${VERSION_TIMESTAMP}"
+		PARENT_SCOPE
+	)
+
+	if("${GIT_VERSION}" MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+([-+].*)?$")
+		set(GIT_VERSION_TRIPLET ${GIT_VERSION})
+		string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-+].*)?$" "\\1"
+			GIT_VERSION_MAJOR "${GIT_VERSION}"
+		)
+		string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-+].*)?$" "\\2"
+			GIT_VERSION_MINOR "${GIT_VERSION}"
+		)
+		string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-+].*)?$" "\\3"
+			GIT_VERSION_PATCH "${GIT_VERSION}"
+		)
+		string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\.([0-9]+)(([-+].*)?)$" "\\4"
+			GIT_VERSION_SUFFIX "${GIT_VERSION}"
+		)
+	else()
+		# Choose a high major number, such that it is always incompatible with existing
+		# tags.
+		set(GIT_VERSION_TRIPLET "9999.0.0")
+		set(GIT_VERSION_MAJOR 9999)
+		set(GIT_VERSION_MINOR 0)
+		set(GIT_VERSION_PATCH 0)
+		set(GIT_VERSION_SUFFIX "+${GIT_HASH_SHORT}")
+	endif()
+
+	set(GIT_VERSION_TRIPLET ${GIT_VERSION_TRIPLET} PARENT_SCOPE)
+	set(GIT_VERSION_MAJOR ${GIT_VERSION_MAJOR} PARENT_SCOPE)
+	set(GIT_VERSION_MINOR ${GIT_VERSION_MINOR} PARENT_SCOPE)
+	set(GIT_VERSION_PATCH ${GIT_VERSION_PATCH} PARENT_SCOPE)
+	set(GIT_VERSION_SUFFIX ${GIT_VERSION_SUFFIX} PARENT_SCOPE)
+
+	string(TOUPPER "${PROJECT_NAME}" PROJECT_NAME_UC)
+	string(REGEX REPLACE "[^A-Z0-9]+" "_" PROJECT_NAME_UC "${PROJECT_NAME_UC}")
+
+	file(
+		GENERATE
+		OUTPUT ${PROJECT_BINARY_DIR}/version.sh
+		CONTENT "#!/bin/bash
+
+#This is a generated file. Do not edit.
+
+GIT_VERSION=\"${GIT_VERSION}\"
+GIT_HASH=\"${GIT_HASH}\"
+GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
+"
+	)
+
+	file(
+		GENERATE
+		OUTPUT ${PROJECT_BINARY_DIR}/version.ps1
+		CONTENT "#!/bin/bash
+
+#This is a generated file. Do not edit.
+
+$GIT_VERSION=\"${GIT_VERSION}\"
+$GIT_HASH=\"${GIT_HASH}\"
+$GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
+"
+	)
+
+	file(
+		GENERATE
+		OUTPUT ${PROJECT_BINARY_DIR}/include/${PROJECT_NAME}_version.h
+		CONTENT "// clang-format off
+#ifndef ${PROJECT_NAME_UC}_VERSION_H
+#define ${PROJECT_NAME_UC}_VERSION_H
+
+/* This is a generated file. Do not edit. */
+
+#define ${PROJECT_NAME_UC}_VERSION_HASH    \"${GIT_HASH}\"
+#define ${PROJECT_NAME_UC}_VERSION         \"${GIT_VERSION}\"
+#define ${PROJECT_NAME_UC}_TIMESTAMP       \"${VERSION_TIMESTAMP}\"
+
+#define ${PROJECT_NAME_UC}_VERSION_MAJOR    ${GIT_VERSION_MAJOR}
+#define ${PROJECT_NAME_UC}_VERSION_MINOR    ${GIT_VERSION_MINOR}
+#define ${PROJECT_NAME_UC}_VERSION_PATCH    ${GIT_VERSION_PATCH}
+#define ${PROJECT_NAME_UC}_VERSION_SUFFIX  \"${GIT_VERSION_SUFFIX}\"
+
+#if ${PROJECT_NAME_UC}_VERSION_MINOR >= 100L
+#  error ${PROJECT_NAME_UC}_VERSION_MINOR (${GIT_VERSION_MINOR}) too large.
+#endif
+
+#if ${PROJECT_NAME_UC}_VERSION_PATCH >= 100L
+#  error ${PROJECT_NAME_UC}_VERSION_PATCH (${GIT_VERSION_PATCH}) too large.
+#endif
+
+#define ${PROJECT_NAME_UC}_VERSION_NUM           \\
+	(${PROJECT_NAME_UC}_VERSION_MAJOR * 10000L + \\
+	 ${PROJECT_NAME_UC}_VERSION_MINOR * 100L +   \\
+	 ${PROJECT_NAME_UC}_VERSION_PATCH * 1L)
+
+#endif // ${PROJECT_NAME_UC}_VERSION_H
+    // clang-format on
+"
+	)
+
+	file(WRITE ${PROJECT_BINARY_DIR}/version.txt "${GIT_VERSION}")
+
+	if(NOT TARGET ${PROJECT_NAME}-version)
+		add_library(${PROJECT_NAME}-version INTERFACE)
+
+		target_include_directories(${PROJECT_NAME}-version INTERFACE
+			"$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>"
+			"$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+		)
+	endif()
+endfunction()
 
 # Common Platform Enumeration: https://nvd.nist.gov/products/cpe
 #
@@ -52,18 +316,18 @@ endif()
 
 # Sets the given variable to a unique SPDIXID-compatible value.
 function(sbom_spdxid)
-	set(options)
 	set(oneValueArgs VARIABLE CHECK)
 	set(multiValueArgs HINTS)
 
 	cmake_parse_arguments(
-		SBOM_SPDXID "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
+		SBOM_SPDXID "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
 	)
+
 	if(SBOM_SPDXID_UNPARSED_ARGUMENTS)
 		message(FATAL_ERROR "Unknown arguments: ${SBOM_SPDXID_UNPARSED_ARGUMENTS}")
 	endif()
 
-	if("${SBOM_SPDXID_VARIABLE}" STREQUAL "")
+	if(NOT DEFINED SBOM_SPDXID_VARIABLE)
 		message(FATAL_ERROR "Missing VARIABLE")
 	endif()
 
@@ -76,6 +340,7 @@ function(sbom_spdxid)
 		foreach(_hint IN LISTS SBOM_SPDXID_HINTS)
 			string(REGEX REPLACE "[^a-zA-Z0-9]+" "-" _id "${_hint}")
 			string(REGEX REPLACE "-+$" "" _id "${_id}")
+
 			if(NOT "${_id}" STREQUAL "")
 				set(_id "${_id}${_suffix}")
 				break()
@@ -93,91 +358,85 @@ function(sbom_spdxid)
 		message(FATAL_ERROR "Invalid SPDXID \"${_id}\"")
 	endif()
 
-	set(${SBOM_SPDXID_VARIABLE}
-	    "${_id}"
-	    PARENT_SCOPE
-	)
+	set(${SBOM_SPDXID_VARIABLE} "${_id}" PARENT_SCOPE)
 endfunction()
 
 # Starts SBOM generation. Call sbom_add() and friends afterwards. End with sbom_finalize(). Input
 # files allow having variables and generator expressions.
 function(sbom_generate)
-	set(options)
 	set(oneValueArgs
-	    OUTPUT
-	    LICENSE
-	    COPYRIGHT
-	    PROJECT
-	    SUPPLIER
-	    SUPPLIER_URL
-	    NAMESPACE
+		OUTPUT
+		LICENSE
+		COPYRIGHT
+		PROJECT
+		SUPPLIER
+		SUPPLIER_URL
+		NAMESPACE
+		ENABLE_CHECKS
 	)
 	set(multiValueArgs INPUT)
 	cmake_parse_arguments(
-		SBOM_GENERATE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
+		SBOM_GENERATE "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
 	)
+
 	if(SBOM_GENERATE_UNPARSED_ARGUMENTS)
 		message(FATAL_ERROR "Unknown arguments: ${SBOM_GENERATE_UNPARSED_ARGUMENTS}")
 	endif()
 
-	string(TIMESTAMP NOW_UTC UTC)
+	if(NOT DEFINED SBOM_GENERATE_INPUT)
+		if(NOT DEFINED SBOM_SUPPLIER AND NOT DEFINED SBOM_GENERATE_SUPPLIER)
+			message(FATAL_ERROR "Specify a SUPPLIER, or set CACHE variable SBOM_SUPPLIER")
+		elseif(DEFINED SBOM_SUPPLIER AND NOT DEFINED SBOM_GENERATE_SUPPLIER)
+			set(SBOM_GENERATE_SUPPLIER ${SBOM_SUPPLIER})
+		elseif(${SBOM_GENERATE_SUPPLIER} STREQUAL "")
+			message(FATAL_ERROR "SUPPLIER is empty string")
+		endif()
 
-	if("${SBOM_GENERATE_OUTPUT}" STREQUAL "")
-		set(SBOM_GENERATE_OUTPUT
-		    "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/${PROJECT_NAME}-sbom-${GIT_VERSION_PATH}.spdx"
-		)
+		if(NOT DEFINED SBOM_SUPPLIER_URL AND NOT DEFINED SBOM_GENERATE_SUPPLIER_URL)
+			message(FATAL_ERROR "Specify a SUPPLIER_URL, or set CACHE variable SBOM_SUPPLIER_URL")
+		elseif(DEFINED SBOM_SUPPLIER_URL AND NOT DEFINED SBOM_GENERATE_SUPPLIER_URL)
+			set(SBOM_GENERATE_SUPPLIER_URL ${SBOM_SUPPLIER_URL})
+		elseif(${SBOM_GENERATE_SUPPLIER_URL} STREQUAL "")
+			message(FATAL_ERROR "SUPPLIER_URL is empty string")
+		endif()
 	endif()
 
-	if("${SBOM_GENERATE_LICENSE}" STREQUAL "")
+	if(NOT DEFINED GIT_VERSION)
+		version_extract()
+	endif()
+
+	string(TIMESTAMP NOW_UTC UTC)
+
+	if(NOT DEFINED SBOM_GENERATE_OUTPUT)
+		set(SBOM_GENERATE_OUTPUT "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/${PROJECT_NAME}-sbom-${GIT_VERSION_PATH}.spdx")
+	endif()
+
+	if(NOT DEFINED SBOM_GENERATE_LICENSE)
 		set(SBOM_GENERATE_LICENSE "NOASSERTION")
 	endif()
 
-	if("${SBOM_GENERATE_PROJECT}" STREQUAL "")
-		set(SBOM_GENERATE_PROJECT "${PROJECT_NAME}")
+	if(NOT DEFINED SBOM_GENERATE_PROJECT)
+		set(SBOM_GENERATE_PROJECT ${PROJECT_NAME})
 	endif()
 
-	# The Package- prefix should not be required by NTIA, but the ntia-conformance-checker 2.0.0
-	# seems to check for it. Probably a bug, but add a workaround anyway.
-	string(REGEX MATCH "^Package-" PACKAGE_PREFIX_MATCH ${SBOM_GENERATE_PROJECT})
-	if("${PACKAGE_PREFIX_MATCH}" STREQUAL "")
-		string(PREPEND SBOM_GENERATE_PROJECT "Package-")
-	endif()
-
-	if("${SBOM_GENERATE_SUPPLIER}" STREQUAL "")
-		set(SBOM_GENERATE_SUPPLIER "${SBOM_SUPPLIER}")
-	elseif("${SBOM_SUPPLIER_URL}" STREQUAL "")
-		set(SBOM_SUPPLIER
-		    "${SBOM_GENERATE_SUPPLIER}"
-		    CACHE STRING "SBOM supplier"
-		)
-	endif()
-
-	if("${SBOM_GENERATE_COPYRIGHT}" STREQUAL "")
-		# There is a race when building at New Year's Eve...
+	if(NOT DEFINED SBOM_GENERATE_COPYRIGHT)
 		string(TIMESTAMP NOW_YEAR "%Y" UTC)
-		set(SBOM_GENERATE_COPYRIGHT "${NOW_YEAR} ${SBOM_GENERATE_SUPPLIER}")
+		set(SBOM_GENERATE_COPYRIGHT ${NOW_YEAR} ${SBOM_GENERATE_SUPPLIER})
 	endif()
 
-	if("${SBOM_GENERATE_SUPPLIER_URL}" STREQUAL "")
-		set(SBOM_GENERATE_SUPPLIER_URL "${SBOM_SUPPLIER_URL}")
-		if("${SBOM_GENERATE_SUPPLIER_URL}" STREQUAL "")
-			set(SBOM_GENERATE_SUPPLIER_URL "${PROJECT_HOMEPAGE_URL}")
-		endif()
-	elseif("${SBOM_SUPPLIER_URL}" STREQUAL "")
-		set(SBOM_SUPPLIER_URL
-		    "${SBOM_GENERATE_SUPPLIER_URL}"
-		    CACHE STRING "SBOM supplier URL"
-		)
+	if(NOT DEFINED SBOM_GENERATE_NAMESPACE)
+		set(SBOM_GENERATE_NAMESPACE "${SBOM_GENERATE_SUPPLIER_URL}/spdxdocs/${PROJECT_NAME}-${GIT_VERSION}")
 	endif()
 
-	if("${SBOM_GENERATE_NAMESPACE}" STREQUAL "")
-		set(SBOM_GENERATE_NAMESPACE
-		    "${SBOM_GENERATE_SUPPLIER_URL}/spdxdocs/${PROJECT_NAME}-${GIT_VERSION}"
-		)
+	if(${SBOM_GENERATE_ENABLE_CHECKS})
+		set(SBOM_CHECKS_ENABLED ON CACHE BOOL "Warn on important missing fields.")
+	else()
+		set(SBOM_CHECKS_ENABLED OFF CACHE BOOL "Warn on important missing fields.")
 	endif()
 
 	string(REGEX REPLACE "[^A-Za-z0-9.]+" "-" SBOM_GENERATE_PROJECT "${SBOM_GENERATE_PROJECT}")
 	string(REGEX REPLACE "-+$" "" SBOM_GENERATE_PROJECT "${SBOM_GENERATE_PROJECT}")
+
 	# Prevent collision with other generated SPDXID with -[0-9]+ suffix.
 	string(REGEX REPLACE "-([0-9]+)$" "\\1" SBOM_GENERATE_PROJECT "${SBOM_GENERATE_PROJECT}")
 
@@ -191,19 +450,11 @@ function(sbom_generate)
 
 	file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/sbom)
 
-	if("${SBOM_GENERATE_INPUT}" STREQUAL "")
-		if("${SBOM_GENERATE_SUPPLIER}" STREQUAL "")
-			message(FATAL_ERROR "Specify a SUPPLIER, or set SBOM_SUPPLIER")
-		endif()
-
-		if("${SBOM_GENERATE_SUPPLIER_URL}" STREQUAL "")
-			message(FATAL_ERROR "Specify a SUPPLIER_URL, or set SBOM_SUPPLIER_URL")
-		endif()
-
+	if(NOT DEFINED SBOM_GENERATE_INPUT)
 		set(_f "${CMAKE_CURRENT_BINARY_DIR}/SPDXRef-DOCUMENT.spdx.in")
 
-		if(CMAKE_VERSION VERSION_LESS 3.14)
-			get_filename_component(doc_name "${SBOM_GENERATE_OUTPUT}" NAME_WE)
+		if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.20)
+			cmake_path(GET SBOM_GENERATE_OUTPUT FILENAME doc_name)
 		else()
 			get_filename_component(doc_name "${SBOM_GENERATE_OUTPUT}" NAME_WLE)
 		endif()
@@ -212,15 +463,14 @@ function(sbom_generate)
 			GENERATE
 			OUTPUT "${_f}"
 			CONTENT
-				"SPDXVersion: SPDX-2.3
+			"SPDXVersion: SPDX-2.3
 DataLicense: CC0-1.0
 SPDXID: SPDXRef-DOCUMENT
 DocumentName: ${doc_name}
 DocumentNamespace: ${SBOM_GENERATE_NAMESPACE}
 Creator: Organization: ${SBOM_GENERATE_SUPPLIER}
 Creator: Tool: cmake-sbom
-CreatorComment: <text>This SPDX document was created from CMake ${CMAKE_VERSION}, using cmake-sbom
-from https://github.com/DEMCON/cmake-sbom</text>
+CreatorComment: <text>This SPDX document was created from CMake ${CMAKE_VERSION}, using CMake-SBOM-Builder from https://github.com/sodgeit/CMake-SBOM-Builder</text>
 Created: ${NOW_UTC}\${SBOM_EXT_DOCS}
 
 PackageName: ${CMAKE_CXX_COMPILER_ID}
@@ -264,8 +514,8 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PROJECT}
 		)
 
 		set(SBOM_LAST_SPDXID
-		    "SPDXRef-${SBOM_GENERATE_PROJECT}"
-		    PARENT_SCOPE
+			"SPDXRef-${SBOM_GENERATE_PROJECT}"
+			PARENT_SCOPE
 		)
 	else()
 		foreach(_f IN LISTS SBOM_GENERATE_INPUT)
@@ -287,8 +537,8 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PROJECT}
 		endforeach()
 
 		set(SBOM_LAST_SPDXID
-		    ""
-		    PARENT_SCOPE
+			""
+			PARENT_SCOPE
 		)
 	endif()
 
@@ -296,8 +546,8 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PROJECT}
 
 	set_property(GLOBAL PROPERTY SBOM_FILENAME "${SBOM_GENERATE_OUTPUT}")
 	set(SBOM_FILENAME
-	    "${SBOM_GENERATE_OUTPUT}"
-	    PARENT_SCOPE
+		"${SBOM_GENERATE_OUTPUT}"
+		PARENT_SCOPE
 	)
 	set_property(GLOBAL PROPERTY sbom_project "${SBOM_GENERATE_PROJECT}")
 	set_property(GLOBAL PROPERTY sbom_spdxids 0)
@@ -305,72 +555,8 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PROJECT}
 	file(WRITE ${PROJECT_BINARY_DIR}/sbom/CMakeLists.txt "")
 endfunction()
 
-# Find python.
-#
-# Usage sbom_find_python([REQUIRED])
-macro(sbom_find_python)
-	if(Python3_EXECUTABLE)
-		set(Python3_FOUND TRUE)
-	elseif(NOT CMAKE_VERSION VERSION_LESS 3.12)
-		find_package(Python3 COMPONENTS Interpreter ${ARGV})
-	else()
-		if(WIN32)
-			find_program(Python3_EXECUTABLE NAMES python ${ARGV})
-		else()
-			find_program(Python3_EXECUTABLE NAMES python3 ${ARGV})
-		endif()
-
-		if(Python3_EXECUTABLE)
-			set(Python3_FOUND TRUE)
-		else()
-			set(Python3_FOUND FALSE)
-		endif()
-	endif()
-
-	if(Python3_FOUND)
-		if(NOT DEFINED SBOM_HAVE_PYTHON_DEPS)
-			execute_process(
-				COMMAND
-					${Python3_EXECUTABLE} -c "
-import reuse
-import spdx_tools.spdx.clitools.pyspdxtools
-import ntia_conformance_checker.main
-"
-				RESULT_VARIABLE _res
-				ERROR_QUIET OUTPUT_QUIET
-			)
-
-			if("${_res}" STREQUAL "0")
-				set(SBOM_HAVE_PYTHON_DEPS
-				    TRUE
-				    CACHE INTERNAL ""
-				)
-			else()
-				set(SBOM_HAVE_PYTHON_DEPS
-				    FALSE
-				    CACHE INTERNAL ""
-				)
-			endif()
-		endif()
-
-		if("${ARGN}" STREQUAL "REQUIRED" AND NOT SBOM_HAVE_PYTHON_DEPS)
-			message(FATAL_ERROR "Missing python packages")
-		endif()
-	endif()
-endmacro()
-
-# Verify the generated SBOM. Call after sbom_generate() and other SBOM populating commands.
+# Finalize the generated SBOM. Call after sbom_generate() and other SBOM populating commands.
 function(sbom_finalize)
-	set(options NO_VERIFY VERIFY)
-	set(oneValueArgs GRAPH)
-	set(multiValueArgs)
-	cmake_parse_arguments(
-		SBOM_FINALIZE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
-	)
-	if(SBOM_FINALIZE_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${SBOM_FINALIZE_UNPARSED_ARGUMENTS}")
-	endif()
-
 	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
 	get_property(_sbom_project GLOBAL PROPERTY sbom_project)
 
@@ -379,7 +565,7 @@ function(sbom_finalize)
 	endif()
 
 	file(
-		WRITE ${PROJECT_BINARY_DIR}/sbom/verify.cmake
+		WRITE ${PROJECT_BINARY_DIR}/sbom/finalize.cmake
 		"
 		message(STATUS \"Finalizing: ${_sbom}\")
 		list(SORT SBOM_VERIFICATION_CODES)
@@ -390,59 +576,7 @@ function(sbom_finalize)
 		"
 	)
 
-	if(NOT "${SBOM_FINALIZE_GRAPH}" STREQUAL "")
-		set(SBOM_FINALIZE_NO_VERIFY FALSE)
-		set(SBOM_FINALIZE_VERIFY TRUE)
-		set(_graph --graph --outfile "${SBOM_FINALIZE_GRAPH}")
-	else()
-		set(_graph)
-	endif()
-
-	if(SBOM_FINALIZE_NO_VERIFY)
-		set(SBOM_FINALIZE_VERIFY FALSE)
-	else()
-		if(SBOM_FINALIZE_VERIFY)
-			# Force verify.
-			set(_req REQUIRED)
-		else()
-			# Check if we can verify.
-			set(_req)
-		endif()
-
-		sbom_find_python(${_req})
-
-		if(Python3_FOUND)
-			set(SBOM_FINALIZE_VERIFY TRUE)
-		endif()
-	endif()
-
-	if(SBOM_FINALIZE_VERIFY)
-		file(
-			APPEND ${PROJECT_BINARY_DIR}/sbom/verify.cmake
-			"
-			message(STATUS \"Verifying: ${_sbom}\")
-			execute_process(
-				COMMAND ${Python3_EXECUTABLE} -m spdx_tools.spdx.clitools.pyspdxtools
-				-i \"${_sbom}\" ${_graph}
-				RESULT_VARIABLE _res
-			)
-			if(NOT _res EQUAL 0)
-				message(FATAL_ERROR \"SBOM verification failed\")
-			endif()
-
-			execute_process(
-				COMMAND ${Python3_EXECUTABLE} -m ntia_conformance_checker.main
-				--file \"${_sbom}\"
-				RESULT_VARIABLE _res
-			)
-			if(NOT _res EQUAL 0)
-				message(FATAL_ERROR \"SBOM NTIA verification failed\")
-			endif()
-			"
-		)
-	endif()
-
-	file(APPEND ${PROJECT_BINARY_DIR}/sbom/CMakeLists.txt "install(SCRIPT verify.cmake)
+	file(APPEND ${PROJECT_BINARY_DIR}/sbom/CMakeLists.txt "install(SCRIPT finalize.cmake)
 "
 	)
 
@@ -450,19 +584,17 @@ function(sbom_finalize)
 	add_subdirectory(${PROJECT_BINARY_DIR}/sbom ${PROJECT_BINARY_DIR}/sbom)
 
 	# Mark finalized.
-	set(SBOM_FILENAME
-	    "${_sbom}"
-	    PARENT_SCOPE
-	)
+	set(SBOM_FILENAME "${_sbom}" PARENT_SCOPE)
 	set_property(GLOBAL PROPERTY sbom_project "")
 endfunction()
 
 # Append a file to the SBOM. Use this after calling sbom_generate().
-function(sbom_file)
+function(_sbom_file)
 	set(options OPTIONAL)
 	set(oneValueArgs FILENAME FILETYPE RELATIONSHIP SPDXID)
 	set(multiValueArgs)
 	cmake_parse_arguments(SBOM_FILE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
 	if(SBOM_FILE_UNPARSED_ARGUMENTS)
 		message(FATAL_ERROR "Unknown arguments: ${SBOM_FILE_UNPARSED_ARGUMENTS}")
 	endif()
@@ -478,34 +610,27 @@ function(sbom_file)
 	)
 
 	set(SBOM_LAST_SPDXID
-	    "${SBOM_FILE_SPDXID}"
-	    PARENT_SCOPE
+		"${SBOM_FILE_SPDXID}"
+		PARENT_SCOPE
 	)
 
 	if("${SBOM_FILE_FILETYPE}" STREQUAL "")
 		message(FATAL_ERROR "Missing FILETYPE argument")
 	endif()
 
-	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
-	get_property(_sbom_project GLOBAL PROPERTY sbom_project)
-
 	if("${SBOM_FILE_RELATIONSHIP}" STREQUAL "")
 		set(SBOM_FILE_RELATIONSHIP "SPDXRef-${_sbom_project} CONTAINS ${SBOM_FILE_SPDXID}")
 	else()
 		string(REPLACE "@SBOM_LAST_SPDXID@" "${SBOM_FILE_SPDXID}" SBOM_FILE_RELATIONSHIP
-			       "${SBOM_FILE_RELATIONSHIP}"
+			"${SBOM_FILE_RELATIONSHIP}"
 		)
-	endif()
-
-	if("${_sbom_project}" STREQUAL "")
-		message(FATAL_ERROR "Call sbom_generate() first")
 	endif()
 
 	file(
 		GENERATE
 		OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_FILE_SPDXID}.cmake
 		CONTENT
-			"
+		"
 			cmake_policy(SET CMP0011 NEW)
 			cmake_policy(SET CMP0012 NEW)
 			if(NOT EXISTS ${CMAKE_INSTALL_PREFIX}/${SBOM_FILE_FILENAME})
@@ -535,12 +660,10 @@ Relationship: ${SBOM_FILE_RELATIONSHIP}
 endfunction()
 
 # Append a target output to the SBOM. Use this after calling sbom_generate().
-function(sbom_target)
-	set(options)
+function(_sbom_target)
 	set(oneValueArgs TARGET)
-	set(multiValueArgs)
 	cmake_parse_arguments(
-		SBOM_TARGET "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
+		SBOM_TARGET "" "${oneValueArgs}" "" ${ARGN}
 	)
 
 	if("${SBOM_TARGET_TARGET}" STREQUAL "")
@@ -548,30 +671,31 @@ function(sbom_target)
 	endif()
 
 	get_target_property(_type ${SBOM_TARGET_TARGET} TYPE)
+
 	if("${_type}" STREQUAL "EXECUTABLE")
-		sbom_file(FILENAME ${CMAKE_INSTALL_BINDIR}/$<TARGET_FILE_NAME:${SBOM_TARGET_TARGET}>
-			  FILETYPE BINARY ${SBOM_TARGET_UNPARSED_ARGUMENTS}
+		_sbom_file(FILENAME ${CMAKE_INSTALL_BINDIR}/$<TARGET_FILE_NAME:${SBOM_TARGET_TARGET}>
+			FILETYPE BINARY ${SBOM_TARGET_UNPARSED_ARGUMENTS}
 		)
 	elseif("${_type}" STREQUAL "STATIC_LIBRARY")
-		sbom_file(FILENAME ${CMAKE_INSTALL_LIBDIR}/$<TARGET_FILE_NAME:${SBOM_TARGET_TARGET}>
-			  FILETYPE BINARY ${SBOM_TARGET_UNPARSED_ARGUMENTS}
+		_sbom_file(FILENAME ${CMAKE_INSTALL_LIBDIR}/$<TARGET_FILE_NAME:${SBOM_TARGET_TARGET}>
+			FILETYPE BINARY ${SBOM_TARGET_UNPARSED_ARGUMENTS}
 		)
 	elseif("${_type}" STREQUAL "SHARED_LIBRARY")
 		if(WIN32)
-			sbom_file(
+			_sbom_file(
 				FILENAME
-					${CMAKE_INSTALL_BINDIR}/$<TARGET_FILE_NAME:${SBOM_TARGET_TARGET}>
+				${CMAKE_INSTALL_BINDIR}/$<TARGET_FILE_NAME:${SBOM_TARGET_TARGET}>
 				FILETYPE BINARY ${SBOM_TARGET_UNPARSED_ARGUMENTS}
 			)
-			sbom_file(
+			_sbom_file(
 				FILENAME
-					${CMAKE_INSTALL_LIBDIR}/$<TARGET_LINKER_FILE_NAME:${SBOM_TARGET_TARGET}>
+				${CMAKE_INSTALL_LIBDIR}/$<TARGET_LINKER_FILE_NAME:${SBOM_TARGET_TARGET}>
 				FILETYPE BINARY OPTIONAL ${SBOM_TARGET_UNPARSED_ARGUMENTS}
 			)
 		else()
-			sbom_file(
+			_sbom_file(
 				FILENAME
-					${CMAKE_INSTALL_LIBDIR}/$<TARGET_FILE_NAME:${SBOM_TARGET_TARGET}>
+				${CMAKE_INSTALL_LIBDIR}/$<TARGET_FILE_NAME:${SBOM_TARGET_TARGET}>
 				FILETYPE BINARY ${SBOM_TARGET_UNPARSED_ARGUMENTS}
 			)
 		endif()
@@ -580,19 +704,18 @@ function(sbom_target)
 	endif()
 
 	set(SBOM_LAST_SPDXID
-	    "${SBOM_LAST_SPDXID}"
-	    PARENT_SCOPE
+		"${SBOM_LAST_SPDXID}"
+		PARENT_SCOPE
 	)
 endfunction()
 
 # Append all files recursively in a directory to the SBOM. Use this after calling sbom_generate().
-function(sbom_directory)
-	set(options)
+function(_sbom_directory)
 	set(oneValueArgs DIRECTORY FILETYPE RELATIONSHIP)
-	set(multiValueArgs)
 	cmake_parse_arguments(
-		SBOM_DIRECTORY "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
+		SBOM_DIRECTORY "" "${oneValueArgs}" "" ${ARGN}
 	)
+
 	if(SBOM_DIRECTORY_UNPARSED_ARGUMENTS)
 		message(FATAL_ERROR "Unknown arguments: ${SBOM_DIRECTORY_UNPARSED_ARGUMENTS}")
 	endif()
@@ -609,28 +732,21 @@ function(sbom_directory)
 		message(FATAL_ERROR "Missing FILETYPE argument")
 	endif()
 
-	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
-	get_property(_sbom_project GLOBAL PROPERTY sbom_project)
-
 	if("${SBOM_DIRECTORY_RELATIONSHIP}" STREQUAL "")
 		set(SBOM_DIRECTORY_RELATIONSHIP
-		    "SPDXRef-${_sbom_project} CONTAINS ${SBOM_DIRECTORY_SPDXID}"
+			"SPDXRef-${_sbom_project} CONTAINS ${SBOM_DIRECTORY_SPDXID}"
 		)
 	else()
 		string(REPLACE "@SBOM_LAST_SPDXID@" "${SBOM_DIRECTORY_SPDXID}"
-			       SBOM_DIRECTORY_RELATIONSHIP "${SBOM_DIRECTORY_RELATIONSHIP}"
+			SBOM_DIRECTORY_RELATIONSHIP "${SBOM_DIRECTORY_RELATIONSHIP}"
 		)
-	endif()
-
-	if("${_sbom_project}" STREQUAL "")
-		message(FATAL_ERROR "Call sbom_generate() first")
 	endif()
 
 	file(
 		GENERATE
 		OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${SBOM_DIRECTORY_SPDXID}.cmake"
 		CONTENT
-			"
+		"
 			file(GLOB_RECURSE _files
 				LIST_DIRECTORIES false RELATIVE \"${CMAKE_INSTALL_PREFIX}\"
 				\"${CMAKE_INSTALL_PREFIX}/${SBOM_DIRECTORY_DIRECTORY}/*\"
@@ -660,27 +776,27 @@ Relationship: ${SBOM_DIRECTORY_RELATIONSHIP}-\${_count}
 	install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_DIRECTORY_SPDXID}.cmake)
 
 	set(SBOM_LAST_SPDXID
-	    ""
-	    PARENT_SCOPE
+		""
+		PARENT_SCOPE
 	)
 endfunction()
 
 # Append a package (without files) to the SBOM. Use this after calling sbom_generate().
-function(sbom_package)
-	set(options)
+function(_sbom_package)
 	set(oneValueArgs
-	    PACKAGE
-	    VERSION
-	    LICENSE
-	    DOWNLOAD_LOCATION
-	    RELATIONSHIP
-	    SPDXID
-	    SUPPLIER
+		PACKAGE
+		VERSION
+		LICENSE
+		DOWNLOAD_LOCATION
+		RELATIONSHIP
+		SPDXID
+		SUPPLIER
 	)
 	set(multiValueArgs EXTREF)
 	cmake_parse_arguments(
-		SBOM_PACKAGE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
+		SBOM_PACKAGE "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
 	)
+
 	if(SBOM_PACKAGE_UNPARSED_ARGUMENTS)
 		message(FATAL_ERROR "Unknown arguments: ${SBOM_PACKAGE_UNPARSED_ARGUMENTS}")
 	endif()
@@ -699,19 +815,24 @@ function(sbom_package)
 		HINTS "SPDXRef-${SBOM_PACKAGE_PACKAGE}"
 	)
 
-	set(SBOM_LAST_SPDXID
-	    "${SBOM_PACKAGE_SPDXID}"
-	    PARENT_SCOPE
-	)
+	set(SBOM_LAST_SPDXID ${SBOM_PACKAGE_SPDXID} PARENT_SCOPE)
 
 	set(_fields)
 
 	if("${SBOM_PACKAGE_VERSION}" STREQUAL "")
 		set(SBOM_PACKAGE_VERSION "unknown")
+
+		if(${SBOM_CHECKS_ENABLED})
+			message(WARNING "Version missing for package: ${SBOM_PACKAGE_PACKAGE}. (semver/commit-hash)")
+		endif()
 	endif()
 
 	if("${SBOM_PACKAGE_SUPPLIER}" STREQUAL "")
 		set(SBOM_PACKAGE_SUPPLIER "Person: Anonymous")
+
+		if(${SBOM_CHECKS_ENABLED})
+			message(WARNING "Supplier missing for package: ${SBOM_PACKAGE_PACKAGE}. (Person/Organization + email/url)")
+		endif()
 	endif()
 
 	if(NOT "${SBOM_PACKAGE_LICENSE}" STREQUAL "")
@@ -722,6 +843,10 @@ PackageLicenseConcluded: ${SBOM_PACKAGE_LICENSE}"
 		set(_fields "${_fields}
 PackageLicenseConcluded: NOASSERTION"
 		)
+
+		if(${SBOM_CHECKS_ENABLED})
+			message(WARNING "LICENSE missing for package ${SBOM_PACKAGE_PACKAGE}. (SPDX license identifier)")
+		endif()
 	endif()
 
 	foreach(_ref IN LISTS SBOM_PACKAGE_EXTREF)
@@ -730,28 +855,21 @@ ExternalRef: ${_ref}"
 		)
 	endforeach()
 
-	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
-	get_property(_sbom_project GLOBAL PROPERTY sbom_project)
-
 	if("${SBOM_PACKAGE_RELATIONSHIP}" STREQUAL "")
 		set(SBOM_PACKAGE_RELATIONSHIP
-		    "SPDXRef-${_sbom_project} DEPENDS_ON ${SBOM_PACKAGE_SPDXID}"
+			"SPDXRef-${_sbom_project} DEPENDS_ON ${SBOM_PACKAGE_SPDXID}"
 		)
 	else()
 		string(REPLACE "@SBOM_LAST_SPDXID@" "${SBOM_PACKAGE_SPDXID}"
-			       SBOM_PACKAGE_RELATIONSHIP "${SBOM_PACKAGE_RELATIONSHIP}"
+			SBOM_PACKAGE_RELATIONSHIP "${SBOM_PACKAGE_RELATIONSHIP}"
 		)
-	endif()
-
-	if("${_sbom_project}" STREQUAL "")
-		message(FATAL_ERROR "Call sbom_generate() first")
 	endif()
 
 	file(
 		GENERATE
 		OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_PACKAGE_SPDXID}.cmake
 		CONTENT
-			"
+		"
 			file(APPEND \"${PROJECT_BINARY_DIR}/sbom/sbom.spdx.in\"
 \"
 PackageName: ${SBOM_PACKAGE_PACKAGE}
@@ -771,19 +889,18 @@ Relationship: ${SBOM_PACKAGE_SPDXID} CONTAINS NOASSERTION
 	)
 
 	file(APPEND ${PROJECT_BINARY_DIR}/sbom/CMakeLists.txt
-	     "install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_PACKAGE_SPDXID}.cmake)
+		"install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_PACKAGE_SPDXID}.cmake)
 "
 	)
 endfunction()
 
 # Add a reference to a package in an external file.
-function(sbom_external)
-	set(options)
+function(_sbom_external)
 	set(oneValueArgs EXTERNAL FILENAME RENAME SPDXID RELATIONSHIP)
-	set(multiValueArgs)
 	cmake_parse_arguments(
-		SBOM_EXTERNAL "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
+		SBOM_EXTERNAL "" "${oneValueArgs}" "" ${ARGN}
 	)
+
 	if(SBOM_EXTERNAL_UNPARSED_ARGUMENTS)
 		message(FATAL_ERROR "Unknown arguments: ${SBOM_EXTERNAL_UNPARSED_ARGUMENTS}")
 	endif()
@@ -807,27 +924,17 @@ function(sbom_external)
 		message(FATAL_ERROR "Invalid DocumentRef \"${SBOM_EXTERNAL_SPDXID}\"")
 	endif()
 
-	set(SBOM_LAST_SPDXID
-	    "${SBOM_EXTERNAL_SPDXID}"
-	    PARENT_SCOPE
-	)
-
-	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
-	get_property(_sbom_project GLOBAL PROPERTY sbom_project)
-
-	if("${_sbom_project}" STREQUAL "")
-		message(FATAL_ERROR "Call sbom_generate() first")
-	endif()
+	set(SBOM_LAST_SPDXID "${SBOM_EXTERNAL_SPDXID}" PARENT_SCOPE)
 
 	get_filename_component(sbom_dir "${_sbom}" DIRECTORY)
 
 	if("${SBOM_EXTERNAL_RELATIONSHIP}" STREQUAL "")
 		set(SBOM_EXTERNAL_RELATIONSHIP
-		    "SPDXRef-${_sbom_project} DEPENDS_ON ${SBOM_EXTERNAL_SPDXID}:${SBOM_EXTERNAL_EXTERNAL}"
+			"SPDXRef-${_sbom_project} DEPENDS_ON ${SBOM_EXTERNAL_SPDXID}:${SBOM_EXTERNAL_EXTERNAL}"
 		)
 	else()
 		string(REPLACE "@SBOM_LAST_SPDXID@" "${SBOM_EXTERNAL_SPDXID}"
-			       SBOM_EXTERNAL_RELATIONSHIP "${SBOM_EXTERNAL_RELATIONSHIP}"
+			SBOM_EXTERNAL_RELATIONSHIP "${SBOM_EXTERNAL_RELATIONSHIP}"
 		)
 	endif()
 
@@ -836,7 +943,7 @@ function(sbom_external)
 		GENERATE
 		OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_EXTERNAL_SPDXID}.cmake
 		CONTENT
-			"
+		"
 			file(SHA1 \"${SBOM_EXTERNAL_FILENAME}\" ext_sha1)
 			file(READ \"${SBOM_EXTERNAL_FILENAME}\" ext_content)
 			if(\"${SBOM_EXTERNAL_RENAME}\" STREQUAL \"\")
@@ -863,63 +970,38 @@ Relationship: ${SBOM_EXTERNAL_RELATIONSHIP}\")
 	)
 
 	file(APPEND ${PROJECT_BINARY_DIR}/sbom/CMakeLists.txt
-	     "install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_EXTERNAL_SPDXID}.cmake)
+		"install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_EXTERNAL_SPDXID}.cmake)
 "
 	)
-
 endfunction()
 
 # Append something to the SBOM. Use this after calling sbom_generate().
-function(sbom_add type)
-	if("${type}" STREQUAL "FILENAME")
-		sbom_file(${ARGV})
-	elseif("${type}" STREQUAL "DIRECTORY")
-		sbom_directory(${ARGV})
-	elseif("${type}" STREQUAL "TARGET")
-		sbom_target(${ARGV})
-	elseif("${type}" STREQUAL "PACKAGE")
-		sbom_package(${ARGV})
-	elseif("${type}" STREQUAL "EXTERNAL")
-		sbom_external(${ARGV})
-	else()
-		message(FATAL_ERROR "Unsupported sbom_add(${type})")
-	endif()
-
-	set(SBOM_LAST_SPDXID
-	    "${SBOM_LAST_SPDXID}"
-	    PARENT_SCOPE
+function(sbom_add)
+	set(options FILENAME DIRECTORY TARGET PACKAGE EXTERNAL)
+	cmake_parse_arguments(
+		SBOM_ADD "${options}" "" "" ${ARGN}
 	)
-endfunction()
 
-# Adds a target that performs `python3 -m reuse lint'.  Python is required with the proper packages
-# installed (see dist/common/requirements.txt).
-function(reuse_lint)
-	if(NOT TARGET ${PROJECT_NAME}-reuse-lint)
-		sbom_find_python(REQUIRED)
+	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
+	get_property(_sbom_project GLOBAL PROPERTY sbom_project)
 
-		add_custom_target(
-			${PROJECT_NAME}-reuse-lint ALL
-			COMMAND ${Python3_EXECUTABLE} -m reuse --root "${PROJECT_SOURCE_DIR}" lint
-			WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-			VERBATIM
-		)
+	if("${_sbom_project}" STREQUAL "")
+		message(FATAL_ERROR "Call sbom_generate() first")
 	endif()
-endfunction()
 
-# Adds a target that generates a SPDX file of the source code.  Python is required with the proper
-# packages installed (see dist/common/requirements.txt).
-function(reuse_spdx)
-	if(NOT TARGET ${PROJECT_NAME}-reuse-spdx)
-		sbom_find_python(REQUIRED)
-
-		set(outfile "${PROJECT_BINARY_DIR}/${PROJECT_NAME}-src.spdx")
-
-		add_custom_target(
-			${PROJECT_NAME}-reuse-spdx ALL
-			COMMAND ${Python3_EXECUTABLE} -m reuse --root "${PROJECT_SOURCE_DIR}" spdx
-				-o "${outfile}"
-			WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-			VERBATIM
-		)
+	if(${SBOM_ADD_EXTERNAL})
+		_sbom_external(${ARGV})
+	elseif(${SBOM_ADD_FILENAME})
+		_sbom_file(${ARGV})
+	elseif(${SBOM_ADD_DIRECTORY})
+		_sbom_directory(${ARGV})
+	elseif(${SBOM_ADD_TARGET})
+		_sbom_target(${ARGV})
+	elseif(${SBOM_ADD_PACKAGE})
+		_sbom_package(${ARGV})
+	else()
+		message(FATAL_ERROR "Unexpected argument")
 	endif()
+
+	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
 endfunction()

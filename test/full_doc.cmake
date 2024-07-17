@@ -12,8 +12,8 @@ sbom_generate(
 	LICENSE "CC0-1.0"
 	NAMESPACE "https://test.com/spdxdoc/me"
 	PROJECT "test-full_doc"
-	SUPPLIER Demcon
-	SUPPLIER_URL https://demcon.com
+	SUPPLIER FullDocTest
+	SUPPLIER_URL https://FullDocTest.com
 )
 
 sbom_finalize()
