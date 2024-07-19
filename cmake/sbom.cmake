@@ -588,6 +588,15 @@ function(sbom_finalize)
 	set_property(GLOBAL PROPERTY sbom_project "")
 endfunction()
 
+function(_sbom_verify_filetype FILETYPE)
+	# https://spdx.github.io/spdx-spec/v2.3/file-information/#83-file-type-field
+	set(valid_entries "SOURCE" "BINARY" "ARCHIVE" "APPLICATION" "AUDIO" "IMAGE" "TEXT" "VIDEO" "DOCUMENTATION" "SPDX" "OTHER")
+	list(FIND valid_entries "${FILETYPE}" _index)
+	if(${_index} EQUAL -1)
+		message(FATAL_ERROR "Invalid FILETYPE: ${FILETYPE}")
+	endif()
+endfunction()
+
 # Append a file to the SBOM. Use this after calling sbom_generate().
 function(_sbom_file)
 	set(options OPTIONAL)
@@ -606,6 +615,10 @@ function(_sbom_file)
 	if(NOT DEFINED SBOM_FILE_FILETYPE)
 		message(FATAL_ERROR "Missing FILETYPE argument")
 	endif()
+
+	foreach(_filetype ${SBOM_FILE_FILETYPE})
+		_sbom_verify_filetype("${_filetype}")
+	endforeach()
 
 	sbom_spdxid(
 		VARIABLE SBOM_FILE_SPDXID
