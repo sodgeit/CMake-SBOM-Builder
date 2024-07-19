@@ -158,14 +158,14 @@ Add something to the SBOM.
 ```cmake
 sbom_add(
 	FILENAME <filename>
-	FILETYPE <type>
+	FILETYPE <type> [type2 ...]
 	[RELATIONSHIP <string>]
 	[SPDXID <id>]
 )
 ```
 
 - `FILENAME`: The file to add. It should be a relative path from `CMAKE_INSTALL_PREFIX`. Generator expressions are allowed.
-- `FILETYPE`: The SPDX File Type. Refer to the [SPDX specification](https://spdx.github.io/spdx-spec/v2.3/).
+- `FILETYPE`: One or more file types. Refer to the [SPDX specification Clause 8.3](https://spdx.github.io/spdx-spec/v2.3/file-information/#83-file-type-field).
 - `RELATIONSHIP`: A relationship definition related to this file. The string `@SBOM_LAST_SPDXID@` will be replaced by the SPDXID that is used for this SBOM item. Refer to the [SPDX specification](https://spdx.github.io/spdx-spec/v2.3/).
 - `SPDXID`: The ID to use for identifier generation. By default, generate a new one. Whether or not this is specified, the variable `SBOM_LAST_SPDXID` is set to just generated/used SPDXID, which could be used for later relationship definitions.
 
