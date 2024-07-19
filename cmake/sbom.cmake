@@ -588,11 +588,20 @@ function(sbom_finalize)
 	set_property(GLOBAL PROPERTY sbom_project "")
 endfunction()
 
+function(_sbom_verify_filetype FILETYPE)
+	# https://spdx.github.io/spdx-spec/v2.3/file-information/#83-file-type-field
+	set(valid_entries "SOURCE" "BINARY" "ARCHIVE" "APPLICATION" "AUDIO" "IMAGE" "TEXT" "VIDEO" "DOCUMENTATION" "SPDX" "OTHER")
+	list(FIND valid_entries "${FILETYPE}" _index)
+	if(${_index} EQUAL -1)
+		message(FATAL_ERROR "Invalid FILETYPE: ${FILETYPE}")
+	endif()
+endfunction()
+
 # Append a file to the SBOM. Use this after calling sbom_generate().
 function(_sbom_file)
 	set(options OPTIONAL)
-	set(oneValueArgs FILENAME FILETYPE RELATIONSHIP SPDXID)
-	set(multiValueArgs)
+	set(oneValueArgs FILENAME RELATIONSHIP SPDXID)
+	set(multiValueArgs FILETYPE)
 	cmake_parse_arguments(SBOM_FILE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
 	if(SBOM_FILE_UNPARSED_ARGUMENTS)
@@ -602,6 +611,14 @@ function(_sbom_file)
 	if("${SBOM_FILE_FILENAME}" STREQUAL "")
 		message(FATAL_ERROR "Missing FILENAME argument")
 	endif()
+
+	if(NOT DEFINED SBOM_FILE_FILETYPE)
+		message(FATAL_ERROR "Missing FILETYPE argument")
+	endif()
+
+	foreach(_filetype ${SBOM_FILE_FILETYPE})
+		_sbom_verify_filetype("${_filetype}")
+	endforeach()
 
 	sbom_spdxid(
 		VARIABLE SBOM_FILE_SPDXID
@@ -613,10 +630,6 @@ function(_sbom_file)
 		"${SBOM_FILE_SPDXID}"
 		PARENT_SCOPE
 	)
-
-	if("${SBOM_FILE_FILETYPE}" STREQUAL "")
-		message(FATAL_ERROR "Missing FILETYPE argument")
-	endif()
 
 	if("${SBOM_FILE_RELATIONSHIP}" STREQUAL "")
 		set(SBOM_FILE_RELATIONSHIP "SPDXRef-${_sbom_project} CONTAINS ${SBOM_FILE_SPDXID}")
@@ -631,29 +644,37 @@ function(_sbom_file)
 		OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_FILE_SPDXID}.cmake
 		CONTENT
 		"
-			cmake_policy(SET CMP0011 NEW)
-			cmake_policy(SET CMP0012 NEW)
-			if(NOT EXISTS ${CMAKE_INSTALL_PREFIX}/${SBOM_FILE_FILENAME})
-				if(NOT ${SBOM_FILE_OPTIONAL})
-					message(FATAL_ERROR \"Cannot find ${SBOM_FILE_FILENAME}\")
-				endif()
-			else()
-				file(SHA1 ${CMAKE_INSTALL_PREFIX}/${SBOM_FILE_FILENAME} _sha1)
-				list(APPEND SBOM_VERIFICATION_CODES \${_sha1})
-				file(APPEND \"${PROJECT_BINARY_DIR}/sbom/sbom.spdx.in\"
+cmake_policy(SET CMP0011 NEW)
+cmake_policy(SET CMP0012 NEW)
+if(NOT EXISTS ${CMAKE_INSTALL_PREFIX}/${SBOM_FILE_FILENAME})
+	if(NOT ${SBOM_FILE_OPTIONAL})
+		message(FATAL_ERROR \"Cannot find ${SBOM_FILE_FILENAME}\")
+	endif()
+else()
+	file(SHA1 ${CMAKE_INSTALL_PREFIX}/${SBOM_FILE_FILENAME} _sha1)
+	list(APPEND SBOM_VERIFICATION_CODES \${_sha1})
+	file(APPEND \"${PROJECT_BINARY_DIR}/sbom/sbom.spdx.in\"
 \"
 FileName: ./${SBOM_FILE_FILENAME}
 SPDXID: ${SBOM_FILE_SPDXID}
-FileType: ${SBOM_FILE_FILETYPE}
-FileChecksum: SHA1: \${_sha1}
+\"
+	)
+	foreach(_filetype ${SBOM_FILE_FILETYPE})
+		file(APPEND \"${PROJECT_BINARY_DIR}/sbom/sbom.spdx.in\"
+\"FileType: \${_filetype}
+\"
+		)
+	endforeach()
+	file(APPEND \"${PROJECT_BINARY_DIR}/sbom/sbom.spdx.in\"
+\"FileChecksum: SHA1: \${_sha1}
 LicenseConcluded: NOASSERTION
 LicenseInfoInFile: NOASSERTION
 FileCopyrightText: NOASSERTION
 Relationship: ${SBOM_FILE_RELATIONSHIP}
 \"
-				)
-			endif()
-			"
+	)
+endif()
+	"
 	)
 
 	install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_FILE_SPDXID}.cmake)

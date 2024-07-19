@@ -64,7 +64,7 @@ sbom_add(TARGET example)
 install(FILES ${PROJECT_BINARY_DIR}/version.txt DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/example)
 
 # Mention the version file in the SBOM.
-sbom_add(FILENAME ${CMAKE_INSTALL_DATAROOTDIR}/example/version.txt FILETYPE DOCUMENTATION)
+sbom_add(FILENAME ${CMAKE_INSTALL_DATAROOTDIR}/example/version.txt FILETYPE DOCUMENTATION TEXT)
 
 # Trigger SBOM finalization and verification.
 sbom_finalize()
