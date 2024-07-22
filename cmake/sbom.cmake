@@ -9,6 +9,13 @@ include(GNUInstallDirs)
 
 find_package(Git)
 
+set(SBOM_BUILDER_VERSION "0.0.0-development-version" CACHE STRING "CMake-SBOM-Builder version")
+
+if(SBOM_BUILDER_VERSION MATCHES "development-version")
+	message( WARNING "Your project is using an unstable development version of CMake-SBOM-Builder. \
+Consider switching to a stable release. https://github.com/sodgeit/CMake-SBOM-Builder" )
+endif()
+
 function(version_show)
 	message(STATUS "${PROJECT_NAME} version is ${GIT_VERSION}")
 endfunction()
@@ -467,7 +474,7 @@ SPDXID: SPDXRef-DOCUMENT
 DocumentName: ${doc_name}
 DocumentNamespace: ${SBOM_GENERATE_NAMESPACE}
 Creator: Organization: ${SBOM_GENERATE_SUPPLIER}
-Creator: Tool: cmake-sbom
+Creator: Tool: CMake-SBOM-Builder-${SBOM_BUILDER_VERSION}
 CreatorComment: <text>This SPDX document was created from CMake ${CMAKE_VERSION}, using CMake-SBOM-Builder from https://github.com/sodgeit/CMake-SBOM-Builder</text>
 Created: ${NOW_UTC}\${SBOM_EXT_DOCS}
 
