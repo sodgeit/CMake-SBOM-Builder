@@ -23,11 +23,9 @@ add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/other ${CMAKE_CURRENT_BINARY_DIR}/o
 get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
 
 sbom_generate()
-sbom_add(EXTERNAL SPDXRef-other FILENAME "${_sbom}")
+sbom_add_external(SPDXRef-other "${_sbom}")
 
-sbom_add(
-	EXTERNAL SPDXRef-other
-	FILENAME "${_sbom}"
+sbom_add_external(SPDXRef-other "${_sbom}"
 	RELATIONSHIP "\@SBOM_LAST_SPDXID\@:SPDXRef-other VARIANT_OF ${SBOM_LAST_SPDXID}:SPDXRef-other"
 )
 sbom_finalize()
