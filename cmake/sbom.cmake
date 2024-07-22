@@ -7,8 +7,6 @@ endif()
 
 include(GNUInstallDirs)
 
-set(VERSION_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}" CACHE INTERNAL "")
-
 find_package(Git)
 
 function(version_show)
