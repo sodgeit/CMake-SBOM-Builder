@@ -12,11 +12,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Set SBOM-Builder version by tag
+        run: |
+          mkdir dist
+          sed -e "s/0.0.0-development-version/${GITHUB_REF/refs\/tags\/v}/g" cmake/sbom.cmake > dist/sbom.cmake
+
       - name: Upload sbom.cmake to release
         uses: svenstaro/upload-release-action@v1-release
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref }}
-          file: cmake/sbom.cmake
+          file: dist/sbom.cmake
           file_glob: true
           overwrite: true
