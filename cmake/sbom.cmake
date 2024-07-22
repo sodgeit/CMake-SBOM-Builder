@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 
 # catch and stop second call to this function
 if(COMMAND sbom_generate)
@@ -599,13 +599,14 @@ function(_sbom_verify_filetype FILETYPE)
 	# https://spdx.github.io/spdx-spec/v2.3/file-information/#83-file-type-field
 	set(valid_entries "SOURCE" "BINARY" "ARCHIVE" "APPLICATION" "AUDIO" "IMAGE" "TEXT" "VIDEO" "DOCUMENTATION" "SPDX" "OTHER")
 	list(FIND valid_entries "${FILETYPE}" _index)
+
 	if(${_index} EQUAL -1)
 		message(FATAL_ERROR "Invalid FILETYPE: ${FILETYPE}")
 	endif()
 endfunction()
 
 # Append a file to the SBOM. Use this after calling sbom_generate().
-function(sbom_add_file FILENAME )
+function(sbom_add_file FILENAME)
 	set(options OPTIONAL)
 	set(oneValueArgs RELATIONSHIP SPDXID)
 	set(multiValueArgs FILETYPE)
@@ -691,11 +692,11 @@ function(sbom_add_target NAME)
 	get_target_property(_type ${NAME} TYPE)
 
 	if("${_type}" STREQUAL "EXECUTABLE")
-		sbom_add_file( ${CMAKE_INSTALL_BINDIR}/$<TARGET_FILE_NAME:${NAME}>
+		sbom_add_file(${CMAKE_INSTALL_BINDIR}/$<TARGET_FILE_NAME:${NAME}>
 			FILETYPE BINARY ${ARGN}
 		)
 	elseif("${_type}" STREQUAL "STATIC_LIBRARY")
-		sbom_add_file( ${CMAKE_INSTALL_LIBDIR}/$<TARGET_FILE_NAME:${NAME}>
+		sbom_add_file(${CMAKE_INSTALL_LIBDIR}/$<TARGET_FILE_NAME:${NAME}>
 			FILETYPE BINARY ${ARGN}
 		)
 	elseif("${_type}" STREQUAL "SHARED_LIBRARY")
@@ -719,7 +720,6 @@ function(sbom_add_target NAME)
 	endif()
 
 	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
-
 endfunction()
 
 # Append all files recursively in a directory to the SBOM. Use this after calling sbom_generate().
@@ -787,7 +787,6 @@ Relationship: ${SBOM_DIRECTORY_RELATIONSHIP}-\${_count}
 	install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_DIRECTORY_SPDXID}.cmake)
 
 	set(SBOM_LAST_SPDXID "" PARENT_SCOPE)
-
 endfunction()
 
 # Append a package (without files) to the SBOM. Use this after calling sbom_generate().
@@ -900,7 +899,6 @@ Relationship: ${SBOM_PACKAGE_SPDXID} CONTAINS NOASSERTION
 	)
 
 	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
-
 endfunction()
 
 # Add a reference to a package in an external file.
