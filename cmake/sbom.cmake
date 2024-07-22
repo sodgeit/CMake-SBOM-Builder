@@ -7,8 +7,6 @@ endif()
 
 include(GNUInstallDirs)
 
-set(VERSION_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}" CACHE INTERNAL "")
-
 find_package(Git)
 
 function(version_show)
@@ -588,6 +586,15 @@ function(sbom_finalize)
 	set_property(GLOBAL PROPERTY sbom_project "")
 endfunction()
 
+macro(_sbom_builder_is_setup)
+	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
+	get_property(_sbom_project GLOBAL PROPERTY sbom_project)
+
+	if("${_sbom_project}" STREQUAL "")
+		message(FATAL_ERROR "Call sbom_generate() first")
+	endif()
+endmacro()
+
 function(_sbom_verify_filetype FILETYPE)
 	# https://spdx.github.io/spdx-spec/v2.3/file-information/#83-file-type-field
 	set(valid_entries "SOURCE" "BINARY" "ARCHIVE" "APPLICATION" "AUDIO" "IMAGE" "TEXT" "VIDEO" "DOCUMENTATION" "SPDX" "OTHER")
@@ -598,18 +605,16 @@ function(_sbom_verify_filetype FILETYPE)
 endfunction()
 
 # Append a file to the SBOM. Use this after calling sbom_generate().
-function(_sbom_file)
+function(sbom_add_file FILENAME )
 	set(options OPTIONAL)
-	set(oneValueArgs FILENAME RELATIONSHIP SPDXID)
+	set(oneValueArgs RELATIONSHIP SPDXID)
 	set(multiValueArgs FILETYPE)
 	cmake_parse_arguments(SBOM_FILE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
+	_sbom_builder_is_setup()
+
 	if(SBOM_FILE_UNPARSED_ARGUMENTS)
 		message(FATAL_ERROR "Unknown arguments: ${SBOM_FILE_UNPARSED_ARGUMENTS}")
-	endif()
-
-	if("${SBOM_FILE_FILENAME}" STREQUAL "")
-		message(FATAL_ERROR "Missing FILENAME argument")
 	endif()
 
 	if(NOT DEFINED SBOM_FILE_FILETYPE)
@@ -623,13 +628,10 @@ function(_sbom_file)
 	sbom_spdxid(
 		VARIABLE SBOM_FILE_SPDXID
 		CHECK "${SBOM_FILE_SPDXID}"
-		HINTS "SPDXRef-${SBOM_FILE_FILENAME}"
+		HINTS "SPDXRef-${FILENAME}"
 	)
 
-	set(SBOM_LAST_SPDXID
-		"${SBOM_FILE_SPDXID}"
-		PARENT_SCOPE
-	)
+	set(SBOM_LAST_SPDXID "${SBOM_FILE_SPDXID}" PARENT_SCOPE)
 
 	if("${SBOM_FILE_RELATIONSHIP}" STREQUAL "")
 		set(SBOM_FILE_RELATIONSHIP "SPDXRef-${_sbom_project} CONTAINS ${SBOM_FILE_SPDXID}")
@@ -646,16 +648,16 @@ function(_sbom_file)
 		"
 cmake_policy(SET CMP0011 NEW)
 cmake_policy(SET CMP0012 NEW)
-if(NOT EXISTS ${CMAKE_INSTALL_PREFIX}/${SBOM_FILE_FILENAME})
+if(NOT EXISTS ${CMAKE_INSTALL_PREFIX}/${FILENAME})
 	if(NOT ${SBOM_FILE_OPTIONAL})
-		message(FATAL_ERROR \"Cannot find ${SBOM_FILE_FILENAME}\")
+		message(FATAL_ERROR \"Cannot find ${FILENAME}\")
 	endif()
 else()
-	file(SHA1 ${CMAKE_INSTALL_PREFIX}/${SBOM_FILE_FILENAME} _sha1)
+	file(SHA1 ${CMAKE_INSTALL_PREFIX}/${FILENAME} _sha1)
 	list(APPEND SBOM_VERIFICATION_CODES \${_sha1})
 	file(APPEND \"${PROJECT_BINARY_DIR}/sbom/sbom.spdx.in\"
 \"
-FileName: ./${SBOM_FILE_FILENAME}
+FileName: ./${FILENAME}
 SPDXID: ${SBOM_FILE_SPDXID}
 \"
 	)
@@ -678,74 +680,62 @@ endif()
 	)
 
 	install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_FILE_SPDXID}.cmake)
+
+	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
 endfunction()
 
 # Append a target output to the SBOM. Use this after calling sbom_generate().
-function(_sbom_target)
-	set(oneValueArgs TARGET)
-	cmake_parse_arguments(
-		SBOM_TARGET "" "${oneValueArgs}" "" ${ARGN}
-	)
+function(sbom_add_target NAME)
+	_sbom_builder_is_setup()
 
-	if("${SBOM_TARGET_TARGET}" STREQUAL "")
-		message(FATAL_ERROR "Missing TARGET argument")
-	endif()
-
-	get_target_property(_type ${SBOM_TARGET_TARGET} TYPE)
+	get_target_property(_type ${NAME} TYPE)
 
 	if("${_type}" STREQUAL "EXECUTABLE")
-		_sbom_file(FILENAME ${CMAKE_INSTALL_BINDIR}/$<TARGET_FILE_NAME:${SBOM_TARGET_TARGET}>
-			FILETYPE BINARY ${SBOM_TARGET_UNPARSED_ARGUMENTS}
+		sbom_add_file( ${CMAKE_INSTALL_BINDIR}/$<TARGET_FILE_NAME:${NAME}>
+			FILETYPE BINARY ${ARGN}
 		)
 	elseif("${_type}" STREQUAL "STATIC_LIBRARY")
-		_sbom_file(FILENAME ${CMAKE_INSTALL_LIBDIR}/$<TARGET_FILE_NAME:${SBOM_TARGET_TARGET}>
-			FILETYPE BINARY ${SBOM_TARGET_UNPARSED_ARGUMENTS}
+		sbom_add_file( ${CMAKE_INSTALL_LIBDIR}/$<TARGET_FILE_NAME:${NAME}>
+			FILETYPE BINARY ${ARGN}
 		)
 	elseif("${_type}" STREQUAL "SHARED_LIBRARY")
 		if(WIN32)
-			_sbom_file(
-				FILENAME
-				${CMAKE_INSTALL_BINDIR}/$<TARGET_FILE_NAME:${SBOM_TARGET_TARGET}>
-				FILETYPE BINARY ${SBOM_TARGET_UNPARSED_ARGUMENTS}
+			sbom_add_file(
+				${CMAKE_INSTALL_BINDIR}/$<TARGET_FILE_NAME:${NAME}>
+				FILETYPE BINARY ${ARGN}
 			)
-			_sbom_file(
-				FILENAME
-				${CMAKE_INSTALL_LIBDIR}/$<TARGET_LINKER_FILE_NAME:${SBOM_TARGET_TARGET}>
-				FILETYPE BINARY OPTIONAL ${SBOM_TARGET_UNPARSED_ARGUMENTS}
+			sbom_add_file(
+				${CMAKE_INSTALL_LIBDIR}/$<TARGET_LINKER_FILE_NAME:${NAME}>
+				FILETYPE BINARY OPTIONAL ${ARGN}
 			)
 		else()
-			_sbom_file(
-				FILENAME
-				${CMAKE_INSTALL_LIBDIR}/$<TARGET_FILE_NAME:${SBOM_TARGET_TARGET}>
-				FILETYPE BINARY ${SBOM_TARGET_UNPARSED_ARGUMENTS}
+			sbom_add_file(
+				${CMAKE_INSTALL_LIBDIR}/$<TARGET_FILE_NAME:${NAME}>
+				FILETYPE BINARY ${ARGN}
 			)
 		endif()
 	else()
 		message(FATAL_ERROR "Unsupported target type ${_type}")
 	endif()
 
-	set(SBOM_LAST_SPDXID
-		"${SBOM_LAST_SPDXID}"
-		PARENT_SCOPE
-	)
+	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
+
 endfunction()
 
 # Append all files recursively in a directory to the SBOM. Use this after calling sbom_generate().
-function(_sbom_directory)
-	set(oneValueArgs DIRECTORY FILETYPE RELATIONSHIP)
+function(sbom_add_directory PATH)
+	set(oneValueArgs FILETYPE RELATIONSHIP)
 	cmake_parse_arguments(
 		SBOM_DIRECTORY "" "${oneValueArgs}" "" ${ARGN}
 	)
+
+	_sbom_builder_is_setup()
 
 	if(SBOM_DIRECTORY_UNPARSED_ARGUMENTS)
 		message(FATAL_ERROR "Unknown arguments: ${SBOM_DIRECTORY_UNPARSED_ARGUMENTS}")
 	endif()
 
-	if("${SBOM_DIRECTORY_DIRECTORY}" STREQUAL "")
-		message(FATAL_ERROR "Missing DIRECTORY argument")
-	endif()
-
-	sbom_spdxid(VARIABLE SBOM_DIRECTORY_SPDXID HINTS "SPDXRef-${SBOM_DIRECTORY_DIRECTORY}")
+	sbom_spdxid(VARIABLE SBOM_DIRECTORY_SPDXID HINTS "SPDXRef-${PATH}")
 
 	set(SBOM_LAST_SPDXID "${SBOM_DIRECTORY_SPDXID}")
 
@@ -770,7 +760,7 @@ function(_sbom_directory)
 		"
 			file(GLOB_RECURSE _files
 				LIST_DIRECTORIES false RELATIVE \"${CMAKE_INSTALL_PREFIX}\"
-				\"${CMAKE_INSTALL_PREFIX}/${SBOM_DIRECTORY_DIRECTORY}/*\"
+				\"${CMAKE_INSTALL_PREFIX}/${PATH}/*\"
 			)
 
 			set(_count 0)
@@ -796,16 +786,13 @@ Relationship: ${SBOM_DIRECTORY_RELATIONSHIP}-\${_count}
 
 	install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_DIRECTORY_SPDXID}.cmake)
 
-	set(SBOM_LAST_SPDXID
-		""
-		PARENT_SCOPE
-	)
+	set(SBOM_LAST_SPDXID "" PARENT_SCOPE)
+
 endfunction()
 
 # Append a package (without files) to the SBOM. Use this after calling sbom_generate().
-function(_sbom_package)
+function(sbom_add_package NAME)
 	set(oneValueArgs
-		PACKAGE
 		VERSION
 		LICENSE
 		DOWNLOAD_LOCATION
@@ -818,12 +805,10 @@ function(_sbom_package)
 		SBOM_PACKAGE "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
 	)
 
+	_sbom_builder_is_setup()
+
 	if(SBOM_PACKAGE_UNPARSED_ARGUMENTS)
 		message(FATAL_ERROR "Unknown arguments: ${SBOM_PACKAGE_UNPARSED_ARGUMENTS}")
-	endif()
-
-	if("${SBOM_PACKAGE_PACKAGE}" STREQUAL "")
-		message(FATAL_ERROR "Missing PACKAGE")
 	endif()
 
 	if("${SBOM_PACKAGE_DOWNLOAD_LOCATION}" STREQUAL "")
@@ -833,7 +818,7 @@ function(_sbom_package)
 	sbom_spdxid(
 		VARIABLE SBOM_PACKAGE_SPDXID
 		CHECK "${SBOM_PACKAGE_SPDXID}"
-		HINTS "SPDXRef-${SBOM_PACKAGE_PACKAGE}"
+		HINTS "SPDXRef-${NAME}"
 	)
 
 	set(SBOM_LAST_SPDXID ${SBOM_PACKAGE_SPDXID} PARENT_SCOPE)
@@ -844,7 +829,7 @@ function(_sbom_package)
 		set(SBOM_PACKAGE_VERSION "unknown")
 
 		if(${SBOM_CHECKS_ENABLED})
-			message(WARNING "Version missing for package: ${SBOM_PACKAGE_PACKAGE}. (semver/commit-hash)")
+			message(WARNING "Version missing for package: ${NAME}. (semver/commit-hash)")
 		endif()
 	endif()
 
@@ -852,7 +837,7 @@ function(_sbom_package)
 		set(SBOM_PACKAGE_SUPPLIER "Person: Anonymous")
 
 		if(${SBOM_CHECKS_ENABLED})
-			message(WARNING "Supplier missing for package: ${SBOM_PACKAGE_PACKAGE}. (Person/Organization + email/url)")
+			message(WARNING "Supplier missing for package: ${NAME}. (Person/Organization + email/url)")
 		endif()
 	endif()
 
@@ -866,7 +851,7 @@ PackageLicenseConcluded: NOASSERTION"
 		)
 
 		if(${SBOM_CHECKS_ENABLED})
-			message(WARNING "LICENSE missing for package ${SBOM_PACKAGE_PACKAGE}. (SPDX license identifier)")
+			message(WARNING "LICENSE missing for package ${NAME}. (SPDX license identifier)")
 		endif()
 	endif()
 
@@ -893,7 +878,7 @@ ExternalRef: ${_ref}"
 		"
 			file(APPEND \"${PROJECT_BINARY_DIR}/sbom/sbom.spdx.in\"
 \"
-PackageName: ${SBOM_PACKAGE_PACKAGE}
+PackageName: ${NAME}
 SPDXID: ${SBOM_PACKAGE_SPDXID}
 ExternalRef: SECURITY cpe23Type ${SBOM_CPE}
 PackageDownloadLocation: ${SBOM_PACKAGE_DOWNLOAD_LOCATION}
@@ -913,25 +898,22 @@ Relationship: ${SBOM_PACKAGE_SPDXID} CONTAINS NOASSERTION
 		"install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_PACKAGE_SPDXID}.cmake)
 "
 	)
+
+	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
+
 endfunction()
 
 # Add a reference to a package in an external file.
-function(_sbom_external)
-	set(oneValueArgs EXTERNAL FILENAME RENAME SPDXID RELATIONSHIP)
+function(sbom_add_external ID PATH)
+	set(oneValueArgs RENAME SPDXID RELATIONSHIP)
 	cmake_parse_arguments(
 		SBOM_EXTERNAL "" "${oneValueArgs}" "" ${ARGN}
 	)
 
+	_sbom_builder_is_setup()
+
 	if(SBOM_EXTERNAL_UNPARSED_ARGUMENTS)
 		message(FATAL_ERROR "Unknown arguments: ${SBOM_EXTERNAL_UNPARSED_ARGUMENTS}")
-	endif()
-
-	if("${SBOM_EXTERNAL_EXTERNAL}" STREQUAL "")
-		message(FATAL_ERROR "Missing EXTERNAL")
-	endif()
-
-	if("${SBOM_EXTERNAL_FILENAME}" STREQUAL "")
-		message(FATAL_ERROR "Missing FILENAME")
 	endif()
 
 	if("${SBOM_EXTERNAL_SPDXID}" STREQUAL "")
@@ -951,7 +933,7 @@ function(_sbom_external)
 
 	if("${SBOM_EXTERNAL_RELATIONSHIP}" STREQUAL "")
 		set(SBOM_EXTERNAL_RELATIONSHIP
-			"SPDXRef-${_sbom_project} DEPENDS_ON ${SBOM_EXTERNAL_SPDXID}:${SBOM_EXTERNAL_EXTERNAL}"
+			"SPDXRef-${_sbom_project} DEPENDS_ON ${SBOM_EXTERNAL_SPDXID}:${ID}"
 		)
 	else()
 		string(REPLACE "@SBOM_LAST_SPDXID@" "${SBOM_EXTERNAL_SPDXID}"
@@ -965,17 +947,17 @@ function(_sbom_external)
 		OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_EXTERNAL_SPDXID}.cmake
 		CONTENT
 		"
-			file(SHA1 \"${SBOM_EXTERNAL_FILENAME}\" ext_sha1)
-			file(READ \"${SBOM_EXTERNAL_FILENAME}\" ext_content)
+			file(SHA1 \"${PATH}\" ext_sha1)
+			file(READ \"${PATH}\" ext_content)
 			if(\"${SBOM_EXTERNAL_RENAME}\" STREQUAL \"\")
-				get_filename_component(ext_name \"${SBOM_EXTERNAL_FILENAME}\" NAME)
+				get_filename_component(ext_name \"${PATH}\" NAME)
 				file(WRITE \"${sbom_dir}/\${ext_name}\" \"\${ext_content}\")
 			else()
 				file(WRITE \"${sbom_dir}/${SBOM_EXTERNAL_RENAME}\" \"\${ext_content}\")
 			endif()
 
 			if(NOT \"\${ext_content}\" MATCHES \"[\\r\\n]DocumentNamespace:\")
-				message(FATAL_ERROR \"Missing DocumentNamespace in ${SBOM_EXTERNAL_FILENAME}\")
+				message(FATAL_ERROR \"Missing DocumentNamespace in ${PATH}\")
 			endif()
 
 			string(REGEX REPLACE \"^.*[\\r\\n]DocumentNamespace:[ \\t]*([^#\\r\\n]*).*$\"
@@ -994,35 +976,6 @@ Relationship: ${SBOM_EXTERNAL_RELATIONSHIP}\")
 		"install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_EXTERNAL_SPDXID}.cmake)
 "
 	)
-endfunction()
-
-# Append something to the SBOM. Use this after calling sbom_generate().
-function(sbom_add)
-	set(options FILENAME DIRECTORY TARGET PACKAGE EXTERNAL)
-	cmake_parse_arguments(
-		SBOM_ADD "${options}" "" "" ${ARGN}
-	)
-
-	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
-	get_property(_sbom_project GLOBAL PROPERTY sbom_project)
-
-	if("${_sbom_project}" STREQUAL "")
-		message(FATAL_ERROR "Call sbom_generate() first")
-	endif()
-
-	if(${SBOM_ADD_EXTERNAL})
-		_sbom_external(${ARGV})
-	elseif(${SBOM_ADD_FILENAME})
-		_sbom_file(${ARGV})
-	elseif(${SBOM_ADD_DIRECTORY})
-		_sbom_directory(${ARGV})
-	elseif(${SBOM_ADD_TARGET})
-		_sbom_target(${ARGV})
-	elseif(${SBOM_ADD_PACKAGE})
-		_sbom_package(${ARGV})
-	else()
-		message(FATAL_ERROR "Unexpected argument")
-	endif()
 
 	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
 endfunction()

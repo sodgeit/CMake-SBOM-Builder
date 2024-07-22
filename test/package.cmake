@@ -8,10 +8,10 @@ include(sbom)
 
 sbom_generate(SUPPLIER package_test SUPPLIER_URL https://package_test.com)
 
-sbom_add(PACKAGE foo)
-sbom_add(PACKAGE foo DOWNLOAD_LOCATION http://foo.bar/baz)
-sbom_add(
-	PACKAGE bar
+sbom_add_package(foo)
+sbom_add_package(foo DOWNLOAD_LOCATION http://foo.bar/baz)
+sbom_add_package(
+	bar
 	DOWNLOAD_LOCATION http://somwhere.com/bar
 	LICENSE CC0-1.0
 	SUPPLIER "Person: me"

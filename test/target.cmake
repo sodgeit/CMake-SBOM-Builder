@@ -17,16 +17,16 @@ endif()
 
 add_executable(foo ${CMAKE_CURRENT_BINARY_DIR}/foo.c)
 install(TARGETS foo)
-sbom_add(TARGET foo)
+sbom_add_target(foo)
 
 add_library(libfoo STATIC ${CMAKE_CURRENT_BINARY_DIR}/foo.c)
 install(TARGETS libfoo)
-sbom_add(TARGET libfoo)
+sbom_add_target(libfoo)
 
 add_library(libfoo2 SHARED ${CMAKE_CURRENT_BINARY_DIR}/foo.c)
 install(TARGETS libfoo2 ARCHIVE)
-sbom_add(TARGET libfoo2)
+sbom_add_target(libfoo2)
 
-# Headers are not included. You may want to add sbom_add(DIRECTORY include FILETYPE SOURCE).
+# Headers are not included. You may want to add sbom_add_directory(include FILETYPE SOURCE).
 
 sbom_finalize()
