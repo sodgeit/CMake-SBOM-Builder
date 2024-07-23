@@ -9,18 +9,10 @@ cmake_minimum_required(VERSION 3.16)
 
 project(example-project)
 
-include(GNUInstallDirs)
-
-# Make sure we can find cmake/*.cmake
-list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_CURRENT_LIST_DIR}/../cmake")
-
 # Set some install location. This should probably be done by scripts that control CMake, but for
 # this example, embed it here.
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-	set(CMAKE_INSTALL_PREFIX
-	    "${CMAKE_CURRENT_BINARY_DIR}/deploy"
-	    CACHE PATH "" FORCE
-	)
+	set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/install" CACHE PATH "" FORCE)
 endif()
 
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
@@ -30,7 +22,7 @@ endif()
 # ##################################################################################################
 # SBOM setup
 
-include(sbom)
+include(../cmake/sbom.cmake)
 
 version_extract()
 
