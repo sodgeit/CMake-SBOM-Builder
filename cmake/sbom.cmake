@@ -731,9 +731,8 @@ endfunction()
 
 # Append all files recursively in a directory to the SBOM. Use this after calling sbom_generate().
 function(sbom_add_directory PATH)
-	set(oneValueArgs FILETYPE RELATIONSHIP)
 	cmake_parse_arguments(
-		SBOM_DIRECTORY "" "${oneValueArgs}" "" ${ARGN}
+		SBOM_DIRECTORY "" "RELATIONSHIP" "FILETYPE" ${ARGN}
 	)
 
 	_sbom_builder_is_setup()
@@ -746,9 +745,13 @@ function(sbom_add_directory PATH)
 
 	set(SBOM_LAST_SPDXID "${SBOM_DIRECTORY_SPDXID}")
 
-	if("${SBOM_DIRECTORY_FILETYPE}" STREQUAL "")
+	if(NOT DEFINED SBOM_DIRECTORY_FILETYPE)
 		message(FATAL_ERROR "Missing FILETYPE argument")
 	endif()
+
+	foreach(_filetype ${SBOM_DIRECTORY_FILETYPE})
+		_sbom_verify_filetype("${_filetype}")
+	endforeach()
 
 	if("${SBOM_DIRECTORY_RELATIONSHIP}" STREQUAL "")
 		set(SBOM_DIRECTORY_RELATIONSHIP
@@ -765,30 +768,39 @@ function(sbom_add_directory PATH)
 		OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${SBOM_DIRECTORY_SPDXID}.cmake"
 		CONTENT
 		"
-			file(GLOB_RECURSE _files
-				LIST_DIRECTORIES false RELATIVE \"${CMAKE_INSTALL_PREFIX}\"
-				\"${CMAKE_INSTALL_PREFIX}/${PATH}/*\"
-			)
+file(GLOB_RECURSE _files
+	LIST_DIRECTORIES false RELATIVE \"${CMAKE_INSTALL_PREFIX}\"
+	\"${CMAKE_INSTALL_PREFIX}/${PATH}/*\"
+)
 
-			set(_count 0)
-			foreach(_f IN LISTS _files)
-				file(SHA1 \"${CMAKE_INSTALL_PREFIX}/\${_f}\" _sha1)
-				list(APPEND SBOM_VERIFICATION_CODES \${_sha1})
-				file(APPEND \"${PROJECT_BINARY_DIR}/sbom/sbom.spdx.in\"
+set(_count 0)
+foreach(_f IN LISTS _files)
+	file(SHA1 \"${CMAKE_INSTALL_PREFIX}/\${_f}\" _sha1)
+	list(APPEND SBOM_VERIFICATION_CODES \${_sha1})
+	file(APPEND \"${PROJECT_BINARY_DIR}/sbom/sbom.spdx.in\"
 \"
 FileName: ./\${_f}
 SPDXID: ${SBOM_DIRECTORY_SPDXID}-\${_count}
-FileType: ${SBOM_DIRECTORY_FILETYPE}
+\"
+	)
+	foreach(_filetype ${SBOM_DIRECTORY_FILETYPE})
+		file(APPEND \"${PROJECT_BINARY_DIR}/sbom/sbom.spdx.in\"
+\"FileType: \${_filetype}
+\"
+		)
+	endforeach()
+	file(APPEND \"${PROJECT_BINARY_DIR}/sbom/sbom.spdx.in\"
+\"FileChecksum: SHA1: \${_sha1}
 FileChecksum: SHA1: \${_sha1}
 LicenseConcluded: NOASSERTION
 LicenseInfoInFile: NOASSERTION
 FileCopyrightText: NOASSERTION
 Relationship: ${SBOM_DIRECTORY_RELATIONSHIP}-\${_count}
 \"
-				)
-				math(EXPR _count \"\${_count} + 1\")
-			endforeach()
-			"
+	)
+	math(EXPR _count \"\${_count} + 1\")
+endforeach()
+"
 	)
 
 	install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_DIRECTORY_SPDXID}.cmake)
