@@ -54,15 +54,32 @@ To use this library, perform the following steps:
 
 1. Put `sbom.cmake` somewhere in your project.
 
-	There are a variety of way's to do this. This example uses cmake directly.
+	There are a variety of way's to do this. We recommend to use CMake directly to keep things simple.
+
+	To download a specifc version:
 
 	```cmake
 	file(
 		DOWNLOAD
-		https://github.com/sodgeit/sbom.cmake/releases/latest/download/sbom.cmake
+		https://github.com/sodgeit/CMake-SBOM-Builder/releases/download/v0.2.1/sbom.cmake
 		${CMAKE_SOURCE_DIR}/cmake/sbom.cmake
 		EXPECTED_HASH SHA256=7b354f3a5976c4626c876850c93944e52c83ec59a159ae5de5be7983f0e17a2a
 	)
+	```
+
+	Or always download the latest release:
+
+	```cmake
+	file(
+		DOWNLOAD
+		https://github.com/sodgeit/CMake-SBOM-Builder/releases/latest/download/sbom.cmake
+		${CMAKE_SOURCE_DIR}/cmake/sbom.cmake
+		EXPECTED_HASH SHA256=7b354f3a5976c4626c876850c93944e52c83ec59a159ae5de5be7983f0e17a2a
+	)
+	```
+
+	Although the later example always fetches the newest version when it's released,
+	the CMake configure stage will fail due to the `EXPECTED_HASH` being different.
 
 2. include `sbom.cmake`:
 
@@ -70,20 +87,24 @@ To use this library, perform the following steps:
 	include(cmake/sbom.cmake)
 	```
 
-3. Somewhere after `project(...)`, prepare the SBOM:
+3. Somewhere ***after*** `project(...)`, prepare the SBOM:
 
 	```cmake
-	sbom_generate(SUPPLIER you SUPPLIER_URL https://some.where)
-	# Add sbom_add() ...
+	sbom_generate(SUPPLIER you SUPPLIER_URL https://www.some.where)
+
+	# Add sbom_add_*() ...
+	sbom_add_package(<library>)
+	sbom_add_file(<file>)
+
 	sbom_finalize()
 	```
 
-4. Build *and install* your project:
+4. Build ***and install*** your project:
 
 	```bash
 	cmake -S . -B build
 	cmake --build build --target all
-	cmake --build build --target install
+	cmake --install build
 	```
 
 The SBOM will by default be generated in your `CMAKE_INSTALL_PREFIX` directory (see also CMake output).
