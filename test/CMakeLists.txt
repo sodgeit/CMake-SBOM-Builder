@@ -27,7 +27,7 @@ project(${name})"
 		DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${name}.cmake
 		COMMAND
 			${CMAKE_COMMAND} "${_dir}/src" -G "${CMAKE_GENERATOR}"
-			"-DCMAKE_INSTALL_PREFIX=${_dir}/out"
+			"-DCMAKE_INSTALL_PREFIX=${_dir}/install"
 			"-DCMAKE_MODULE_PATH=${PROJECT_SOURCE_DIR}/cmake"
 			"-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
 		COMMAND ${CMAKE_COMMAND} --build . --target install
