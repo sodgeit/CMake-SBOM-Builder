@@ -1,0 +1,94 @@
+SPDXVersion: SPDX-2.3
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: Example-sbom.spdx
+DocumentNamespace: https://github.com/sodgeit/CMake-SBOM-Builder/spdxdocs/Example-0.2.1
+Creator: Organization: Example
+Creator: Tool: CMake-SBOM-Builder-0.2.1
+CreatorComment: <text>This SPDX document was created from CMake 3.30.1, using CMake-SBOM-Builder from https://github.com/sodgeit/CMake-SBOM-Builder</text>
+Created: 2024-07-23T19:52:50Z
+
+PackageName: Clang
+SPDXID: SPDXRef-compiler
+PackageVersion: 18.1.8
+PackageDownloadLocation: NOASSERTION
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+PackageSupplier: Organization: Anonymous
+FilesAnalyzed: false
+PackageSummary: <text>The compiler as identified by CMake, running on Windows (AMD64)</text>
+PrimaryPackagePurpose: APPLICATION
+Relationship: SPDXRef-compiler CONTAINS NOASSERTION
+Relationship: SPDXRef-compiler BUILD_DEPENDENCY_OF SPDXRef-Example
+RelationshipComment: <text>SPDXRef-Example is built by compiler Clang (C:/Program Files/LLVM/bin/clang++.exe) version 18.1.8</text>
+
+PackageName: Example
+SPDXID: SPDXRef-Example
+ExternalRef: SECURITY cpe23Type cpe:2.3:o:microsoft:windows_10:-:*:*:*:*:*:x64:*
+ExternalRef: PACKAGE-MANAGER purl pkg:supplier/Example/Example@0.2.1
+PackageVersion: 0.2.1
+PackageSupplier: Organization: Example
+PackageDownloadLocation: NOASSERTION
+PackageLicenseConcluded: CC0-1.0
+PackageLicenseDeclared: CC0-1.0
+PackageCopyrightText: 2024;Example
+PackageHomePage: https://github.com/sodgeit/CMake-SBOM-Builder
+PackageComment: <text>Built by CMake 3.30.1 with Debug configuration for Windows (AMD64)</text>
+PackageVerificationCode: 829065e9867d9b9dbd601cf43946e5bc1f3b9018
+BuiltDate: 2024-07-23T19:52:50Z
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-Example
+
+FileName: ./include/Example_version.h
+SPDXID: SPDXRef-include-Example-version-h-2
+FileType: SOURCE
+FileChecksum: SHA1: 8733f1a5d796d841a5a952013cfb202b5699c0c4
+LicenseConcluded: NOASSERTION
+LicenseInfoInFile: NOASSERTION
+FileCopyrightText: NOASSERTION
+Relationship: SPDXRef-Example CONTAINS SPDXRef-include-Example-version-h-2
+
+FileName: ./share/example/version.txt
+SPDXID: SPDXRef-share-example-version-txt-3
+FileType: DOCUMENTATION
+FileType: TEXT
+FileChecksum: SHA1: b3edaa0ec2dc99651b9a15f4c90a0ab5b7bd2a30
+LicenseConcluded: NOASSERTION
+LicenseInfoInFile: NOASSERTION
+FileCopyrightText: NOASSERTION
+Relationship: SPDXRef-Example CONTAINS SPDXRef-share-example-version-txt-3
+
+FileName: ./bin/example.exe
+SPDXID: SPDXRef-bin-TARGET-FILE-NAME-example-4
+FileType: BINARY
+FileChecksum: SHA1: fbeb387ffbf0f1b6df7407fa72b57b4205ac83ce
+LicenseConcluded: NOASSERTION
+LicenseInfoInFile: NOASSERTION
+FileCopyrightText: NOASSERTION
+Relationship: SPDXRef-Example CONTAINS SPDXRef-bin-TARGET-FILE-NAME-example-4
+
+PackageName: cxxopts
+SPDXID: SPDXRef-cxxopts-0
+ExternalRef: SECURITY cpe23Type cpe:2.3:o:microsoft:windows_10:-:*:*:*:*:*:x64:*
+PackageDownloadLocation: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+PackageVersion: 3.2.0
+PackageSupplier: Jarryd Beck (https://github.com/jarro2783/cxxopts)
+FilesAnalyzed: false
+PackageLicenseConcluded: MIT
+Relationship: SPDXRef-Example DEPENDS_ON SPDXRef-cxxopts-0
+Relationship: SPDXRef-cxxopts-0 CONTAINS NOASSERTION
+
+PackageName: Boost
+SPDXID: SPDXRef-Boost-1
+ExternalRef: SECURITY cpe23Type cpe:2.3:o:microsoft:windows_10:-:*:*:*:*:*:x64:*
+PackageDownloadLocation: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+PackageVersion: 1.85.0
+PackageSupplier: https://www.boost.org
+FilesAnalyzed: false
+PackageLicenseConcluded: BSL-1.0
+Relationship: SPDXRef-Example DEPENDS_ON SPDXRef-Boost-1
+Relationship: SPDXRef-Boost-1 CONTAINS NOASSERTION
