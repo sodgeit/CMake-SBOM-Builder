@@ -19,3 +19,5 @@ sbom_add_package(
 )
 
 sbom_finalize()
+
+@TEST_VERIFY@

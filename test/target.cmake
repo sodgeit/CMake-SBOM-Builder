@@ -30,3 +30,5 @@ sbom_add_target(libfoo2)
 # Headers are not included. You may want to add sbom_add_directory(include FILETYPE SOURCE).
 
 sbom_finalize()
+
+@TEST_VERIFY@

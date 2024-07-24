@@ -20,3 +20,5 @@ sbom_add_file(CMakeLists.txt FILETYPE OTHER)
 sbom_add_file(CMakeLists.txt FILETYPE OTHER SPDXID SPDXRef-again)
 
 sbom_finalize()
+
+@TEST_VERIFY@

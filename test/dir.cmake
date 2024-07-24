@@ -15,3 +15,5 @@ sbom_add_directory(dir FILETYPE TEXT OTHER)
 sbom_add_directory(dir FILETYPE DOCUMENTATION)
 
 sbom_finalize()
+
+@TEST_VERIFY@

@@ -11,3 +11,5 @@ set(SBOM_SUPPLIER_URL https://minimal_test.com)
 
 sbom_generate()
 sbom_finalize()
+
+@TEST_VERIFY@

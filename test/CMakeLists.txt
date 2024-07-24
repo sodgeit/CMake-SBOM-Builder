@@ -20,6 +20,19 @@ function(test name)
 project(${name})"
 	)
 
+	set(TEST_VERIFY
+"install(CODE
+	\"execute_process(
+		COMMAND \\\"pyspdxtools\\\" \\\"-i\\\" \\\"\${SBOM_FILENAME}\\\"
+		ERROR_VARIABLE _output
+	)
+	if(_output MATCHES \\\".*ERROR.*\\\")
+		message(FATAL_ERROR \\\"SPDX verification failed:
+\\\${_output}\\\")
+	endif()\"
+)"
+	)
+
 	configure_file("${name}.cmake" "${_dir}/src/CMakeLists.txt" @ONLY)
 
 	add_custom_target(

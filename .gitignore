@@ -6,3 +6,4 @@
 *.swo
 build
 out
+.vscode

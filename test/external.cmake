@@ -29,3 +29,5 @@ sbom_add_external(SPDXRef-other "${_sbom}"
 	RELATIONSHIP "\@SBOM_LAST_SPDXID\@:SPDXRef-other VARIANT_OF ${SBOM_LAST_SPDXID}:SPDXRef-other"
 )
 sbom_finalize()
+
+@TEST_VERIFY@

@@ -17,3 +17,5 @@ sbom_generate(
 )
 
 sbom_finalize()
+
+@TEST_VERIFY@
