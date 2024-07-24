@@ -101,13 +101,31 @@ To use this library, perform the following steps:
 
 4. Build ***and install*** your project:
 
+	Using single config generators (Makefiles, Ninja):
+
 	```bash
-	cmake -S . -B build
+	cmake -S . -B build -DCMAKE_INSTALL_PREFIX=build/install -DCMAKE_BUILD_TYPE={Debug,Release,...}
 	cmake --build build --target all
 	cmake --install build
 	```
 
-The SBOM will by default be generated in your `CMAKE_INSTALL_PREFIX` directory (see also CMake output).
+	Using multi config generators (Visual Studio, Ninja Multi-Config):
+
+	```bash
+ 	cmake -S . -B build -G "Ninja Multi-Config" -CMAKE_INSTALL_PREFIX=build/install
+	cmake --build build --target all --config {Debug,Release,...} #--target ALL_BUILD for Visual Studio
+ 	cmake --install build --config {Debug,Release,...}
+	```
+
+	***Note:*** The --prefix option is currently not supported. Switching to a different config will overwrite the previous SBOM.
+
+The SBOM will be generated in `CMAKE_INSTALL_PREFIX/share/<PROJECT_NAME>` (see also CMake output).
+
+```text
+	-- Installing: .../build/install/share/example/sbom-example-0.2.1.spdx
+	...
+	-- Finalizing: .../build/install/share/example/sbom-example-0.2.1.spdx
+```
 
 ---
 
