@@ -6,7 +6,7 @@
 
 include(sbom)
 set(SBOM_SUPPLIER ExternalTest)
-set(SBOM_SUPPLIER_URL https://externalTest.com)
+set(SBOM_SUPPLIER_URL https://www.externalTest.com)
 
 make_directory(${CMAKE_CURRENT_BINARY_DIR}/other)
 file(

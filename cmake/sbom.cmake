@@ -994,5 +994,4 @@ Relationship: ${SBOM_EXTERNAL_RELATIONSHIP}\")
 "
 	)
 
-	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
 endfunction()

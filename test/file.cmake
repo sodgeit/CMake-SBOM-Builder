@@ -6,7 +6,7 @@
 
 include(sbom)
 
-sbom_generate(SUPPLIER FileTest SUPPLIER_URL https://fileTest.com)
+sbom_generate(SUPPLIER FileTest SUPPLIER_URL https://www.fileTest.com)
 
 install(FILES ${CMAKE_CURRENT_LIST_FILE} DESTINATION .)
 

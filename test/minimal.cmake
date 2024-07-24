@@ -6,7 +6,7 @@
 
 include(sbom)
 
-sbom_generate(SUPPLIER minimal_test SUPPLIER_URL https://minimal_test.com)
+sbom_generate(SUPPLIER minimal_test SUPPLIER_URL https://www.minimal_test.com)
 sbom_finalize()
 
 @TEST_VERIFY@

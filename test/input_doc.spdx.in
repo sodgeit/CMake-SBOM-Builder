@@ -19,7 +19,7 @@ PackageDownloadLocation: NOASSERTION
 PackageLicenseConcluded: NOASSERTION
 PackageLicenseDeclared: NOASSERTION
 PackageCopyrightText: @SBOM_GENERATE_COPYRIGHT@
-PackageHomePage: https://testOrg.com
+PackageHomePage: https://www.testOrg.com
 BuiltDate: @NOW_UTC@
 PackageVerificationCode: ${SBOM_VERIFICATION_CODE}
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-Package-test
