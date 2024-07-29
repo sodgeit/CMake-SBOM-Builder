@@ -6,7 +6,7 @@
 
 include(sbom)
 
-sbom_generate(SUPPLIER target_test SUPPLIER_URL https://target_test.com)
+sbom_generate(SUPPLIER target_test SUPPLIER_URL https://www.target_test.com)
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/foo.c "int main() {}")
 
@@ -30,3 +30,5 @@ sbom_add_target(libfoo2)
 # Headers are not included. You may want to add sbom_add_directory(include FILETYPE SOURCE).
 
 sbom_finalize()
+
+@TEST_VERIFY@

@@ -13,7 +13,9 @@ sbom_generate(
 	NAMESPACE "https://test.com/spdxdoc/me"
 	PROJECT "test-full_doc"
 	SUPPLIER FullDocTest
-	SUPPLIER_URL https://FullDocTest.com
+	SUPPLIER_URL https://www.fullDocTest.com
 )
 
 sbom_finalize()
+
+@TEST_VERIFY@

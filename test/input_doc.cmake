@@ -9,3 +9,5 @@ include(sbom)
 sbom_generate(INPUT @CMAKE_CURRENT_LIST_DIR@/input_doc.spdx.in COPYRIGHT "2023 me")
 
 sbom_finalize()
+
+@TEST_VERIFY@
