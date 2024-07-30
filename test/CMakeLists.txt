@@ -37,6 +37,16 @@ project(${name})"
 
 	configure_file("${name}.cmake" "${_dir}/src/CMakeLists.txt" @ONLY)
 
+	get_property(_is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+
+	set(configure_args "")
+	set(build_args "")
+	if(NOT _is_multi_config)
+		set(configure_args "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
+	else()
+		set(build_args "--config=$<CONFIG>")
+	endif()
+
 	add_custom_target(
 		test-${name}
 		DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${name}.cmake
@@ -44,8 +54,8 @@ project(${name})"
 			${CMAKE_COMMAND} "${_dir}/src" -G "${CMAKE_GENERATOR}"
 			"-DCMAKE_INSTALL_PREFIX=${_dir}/install"
 			"-DCMAKE_MODULE_PATH=${PROJECT_SOURCE_DIR}/cmake"
-			"-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
-		COMMAND ${CMAKE_COMMAND} --build . --target install
+			${configure_args}
+		COMMAND ${CMAKE_COMMAND} --build . --target install ${build_args}
 		WORKING_DIRECTORY "${_dir}/build"
 		COMMENT "Testing ${name}"
 		VERBATIM

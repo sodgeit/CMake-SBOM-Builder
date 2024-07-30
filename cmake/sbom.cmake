@@ -456,7 +456,7 @@ function(sbom_generate)
 	file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/sbom)
 
 	if(NOT DEFINED SBOM_GENERATE_INPUT)
-		set(_f "${CMAKE_CURRENT_BINARY_DIR}/SPDXRef-DOCUMENT.spdx.in")
+		set(_f "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>_SPDXRef-DOCUMENT.spdx.in")
 
 		if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.20)
 			cmake_path(GET SBOM_GENERATE_OUTPUT FILENAME doc_name)
@@ -504,7 +504,7 @@ PackageLicenseConcluded: ${SBOM_GENERATE_LICENSE}
 PackageLicenseDeclared: ${SBOM_GENERATE_LICENSE}
 PackageCopyrightText: ${SBOM_GENERATE_COPYRIGHT}
 PackageHomePage: ${SBOM_GENERATE_SUPPLIER_URL}
-PackageComment: <text>Built by CMake ${CMAKE_VERSION} with ${CMAKE_BUILD_TYPE} configuration for ${CMAKE_SYSTEM_NAME} (${CMAKE_SYSTEM_PROCESSOR})</text>
+PackageComment: <text>Built by CMake ${CMAKE_VERSION} with $<CONFIG> configuration for ${CMAKE_SYSTEM_NAME} (${CMAKE_SYSTEM_PROCESSOR})</text>
 PackageVerificationCode: \${SBOM_VERIFICATION_CODE}
 BuiltDate: ${NOW_UTC}
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PROJECT}
