@@ -12,7 +12,6 @@ The version extraction helps to get the version in the application and SBOM righ
 To integrate this library in your project, see [below](#how-to-use) for basic instructions or the example for a simple example project.
 
 [SPDX](https://spdx.github.io/spdx-spec/v2.3/)
-[NTIA](http://ntia.gov/SBOM)
 
 ---
 
@@ -24,6 +23,7 @@ While the original project provided a solid foundation, we identified several ar
 Major Changes include:
 
 - **Single-File Integration**: We condensed everything into a single file to facilitate integration with CMake's `file` command, making it simpler and more efficient to use.
+- **Multi Config Generator Enhancements**: The SBOM generation better integrates with multi-config generators like Visual Studio and Ninja Multi-Config. Different SBOM's are generated for each configuration.
 - **CMake-Based Verification**: Some verification processes have been moved into CMake itself. (Though it does not replace external verification tools)
 - **Removed External Python Tools**: The verification process that relied on external Python tools has been removed to minimize dependencies and simplify the setup.
 - **Modernized CMake**: A higher minimum required version (>=3.14), ensuring better compatibility and taking advantage of newer functionalities.
@@ -112,20 +112,27 @@ To use this library, perform the following steps:
 	Using multi config generators (Visual Studio, Ninja Multi-Config):
 
 	```bash
- 	cmake -S . -B build -G "Ninja Multi-Config" -CMAKE_INSTALL_PREFIX=build/install
+	cmake -S . -B build -G "Ninja Multi-Config" -DCMAKE_INSTALL_PREFIX=build/install
 	cmake --build build --target all --config {Debug,Release,...} #--target ALL_BUILD for Visual Studio
- 	cmake --install build --config {Debug,Release,...}
+	cmake --install build --config {Debug,Release,...}
 	```
 
-	***Note:*** The --prefix option is currently not supported. Switching to a different config will overwrite the previous SBOM.
+	We recommend using the `--prefix` option to override the install prefix, when using multi-config generators. This allows the SBOM to be generated in different locations for each configuration.
+	If you don't use the `--prefix` option, the SBOM will be generated in the same location for all configurations, overwriting each other.
 
-The SBOM will be generated in `CMAKE_INSTALL_PREFIX/share/<PROJECT_NAME>` (see also CMake output).
+	```bash
+	cmake -S . -B build -G "Ninja Multi-Config"
+	cmake --build build --target all --config {Debug,Release,...}
+	cmake --install build --config {Debug,Release,...} --prefix build/install/{Debug,Release,...}
+	```
 
-```text
-	-- Installing: .../build/install/share/example/sbom-example-0.2.1.spdx
-	...
-	-- Finalizing: .../build/install/share/example/sbom-example-0.2.1.spdx
-```
+	Per default the SBOM will be generated in `${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}-sbom-${GIT_VERSION_PATH}.spdx` (see also CMake output).
+
+	```text
+		-- Installing: .../build/install/share/example-sbom-example-0.2.1.spdx
+		...
+		-- Finalizing: .../build/install/share/example-sbom-example-0.2.1.spdx
+	```
 
 ---
 
@@ -187,8 +194,16 @@ sbom_generate(
 )
 ```
 
-- `OUTPUT`: Output filename. It should probably start with `${CMAKE_INSTALL_PREFIX}`, as the file is generated during `install`. The variable `SBOM_FILENAME` is set to the full path.
-- `INPUT`: One or more file names, which are concatenated into the SBOM output file. Variables and generator expressions are supported in these files. Variables in the form `@var@` are replaced during config, `${var}` during install. When omitted, a standard document/package SBOM is generated. The other parameters can be referenced in the input files, prefixed with `SBOM_GENERATE_`.
+- `OUTPUT`: Output filename.
+  - Can be absolute or relative to `CMAKE_INSTALL_PREFIX`.
+  - Default location is `${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}-sbom-${GIT_VERSION_PATH}.spdx`.
+  - `--prefix` option is honoured when added to the install command.
+  - `--prefix` and `${CMAKE_INSTALL_PREFIX}` have no effect when `OUTPUT` is an absolute path.
+- `INPUT`: One or more file names, which are concatenated into the SBOM output file.
+  - Variables and generator expressions are supported in these files.
+  - Variables in the form `@var@` are replaced during config, `${var}` during install.
+  - When omitted, a standard document/package SBOM is generated.
+  - The other parameters can be referenced in the input files, prefixed with `SBOM_GENERATE_`.
 - `COPYRIGHT`: Copyright information. If not specified, it is generated as `<year> <supplier>`.
 - `LICENSE`: License information. If not specified, `NOASSERTION` is used.
 - `NAMESPACE`: Document namespace. If not specified, default to a URL based on `SUPPLIER_URL`, `PROJECT_NAME` and `GIT_VERSION`.
@@ -319,7 +334,7 @@ Additionally, you can call `version_generate()` to generate:
 
 ## License
 
-Most of the code in this repository is licensed under MIT. This project complies with [REUSE](https://reuse.software/).
+Most of the code in this repository is licensed under MIT.
 
 ## Acknowledgements
 

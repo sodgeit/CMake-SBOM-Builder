@@ -413,7 +413,7 @@ function(sbom_generate)
 	string(TIMESTAMP NOW_UTC UTC)
 
 	if(NOT DEFINED SBOM_GENERATE_OUTPUT)
-		set(SBOM_GENERATE_OUTPUT "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/${PROJECT_NAME}-sbom-${GIT_VERSION_PATH}.spdx")
+		set(SBOM_GENERATE_OUTPUT "./${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}-sbom-${GIT_VERSION_PATH}.spdx")
 	endif()
 
 	if(NOT DEFINED SBOM_GENERATE_LICENSE)
@@ -600,7 +600,6 @@ configure_file(\"\${SBOM_INTERMEDIATE_FILE}\" \"\${SBOM_FILENAME}\")
 endfunction()
 
 macro(_sbom_builder_is_setup)
-	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
 	get_property(_sbom_project GLOBAL PROPERTY sbom_project)
 
 	if("${_sbom_project}" STREQUAL "")
@@ -775,13 +774,13 @@ function(sbom_add_directory PATH)
 		CONTENT
 		"
 file(GLOB_RECURSE _files
-	LIST_DIRECTORIES false RELATIVE \"${CMAKE_INSTALL_PREFIX}\"
-	\"${CMAKE_INSTALL_PREFIX}/${PATH}/*\"
+	LIST_DIRECTORIES false RELATIVE \"\${CMAKE_INSTALL_PREFIX}\"
+	\"\${CMAKE_INSTALL_PREFIX}/${PATH}/*\"
 )
 
 set(_count 0)
 foreach(_f IN LISTS _files)
-	file(SHA1 \"${CMAKE_INSTALL_PREFIX}/\${_f}\" _sha1)
+	file(SHA1 \"\${CMAKE_INSTALL_PREFIX}/\${_f}\" _sha1)
 	list(APPEND SBOM_VERIFICATION_CODES \${_sha1})
 	file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
 \"
