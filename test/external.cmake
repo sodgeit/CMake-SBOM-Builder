@@ -20,6 +20,7 @@ file(
 add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/other ${CMAKE_CURRENT_BINARY_DIR}/other-build)
 
 # Last generated SBOM file. It's valid until the next sbom_generate().
+# this is just used for testing purposes. Do not rely on this in production code.
 get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
 
 sbom_generate()
