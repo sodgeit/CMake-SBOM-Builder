@@ -223,10 +223,8 @@ GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
 
 	file(
 		GENERATE
-		CONTENT "#!/bin/bash
 		OUTPUT ${VERSION_SCRIPTS_DIR}/version.ps1
-
-#This is a generated file. Do not edit.
+		CONTENT "#This is a generated file. Do not edit.
 
 $GIT_VERSION=\"${GIT_VERSION}\"
 $GIT_HASH=\"${GIT_HASH}\"
