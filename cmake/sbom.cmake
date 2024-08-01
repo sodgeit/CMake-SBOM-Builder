@@ -106,27 +106,33 @@ function(version_extract)
 		set(version_build "+build$ENV{CI_BUILD_ID}")
 	endif()
 
-	set(GIT_HASH "${_git_full_hash}" PARENT_SCOPE)
-	set(GIT_HASH_SHORT "${_git_short_hash}" PARENT_SCOPE)
-
+	# HEAD points directly to a tag
 	if(NOT ${_git_tag} STREQUAL "")
-		set(_GIT_VERSION "${_git_tag}")
-
-		if("${_GIT_VERSION}" MATCHES "^v[0-9]+\.")
-			string(REGEX REPLACE "^v" "" _GIT_VERSION "${_GIT_VERSION}")
-		endif()
-
-		set(GIT_VERSION "${_GIT_VERSION}${_git_dirty}")
+		set(_git_version "${_git_tag}")
 	else()
-		set(GIT_VERSION
-			"${_git_short_hash}+${_git_branch}${version_build}${_git_dirty}"
-		)
+		set(_git_version "${_git_describe}+${_git_branch}${version_build}")
 	endif()
 
-	set(GIT_VERSION "${GIT_VERSION}" PARENT_SCOPE)
-	string(REGEX REPLACE "[^-a-zA-Z0-9_.]+" "+" _GIT_VERSION_PATH "${GIT_VERSION}")
-	set(GIT_VERSION_PATH "${_GIT_VERSION_PATH}" PARENT_SCOPE)
+	set(_git_version "${_git_version}${_git_dirty}")
 
+	set(GIT_HASH "${_git_full_hash}" PARENT_SCOPE)
+	set(GIT_HASH_SHORT "${_git_short_hash}" PARENT_SCOPE)
+	set(GIT_VERSION "${_git_version}" PARENT_SCOPE)
+	string(REGEX REPLACE "[^-a-zA-Z0-9_.+]+" "_" _git_version_path "${_git_version}")
+	set(GIT_VERSION_PATH "${_git_version_path}" PARENT_SCOPE)
+
+	if(_git_version MATCHES "^(v)?([0-9]+)\\.([0-9]+)\\.([0-9]+)(.+)$")
+		set(GIT_VERSION_TRIPLET "${CMAKE_MATCH_2}.${CMAKE_MATCH_3}.${CMAKE_MATCH_4}" PARENT_SCOPE)
+		set(GIT_VERSION_MAJOR "${CMAKE_MATCH_2}" PARENT_SCOPE)
+		set(GIT_VERSION_MINOR "${CMAKE_MATCH_3}" PARENT_SCOPE)
+		set(GIT_VERSION_PATCH "${CMAKE_MATCH_4}" PARENT_SCOPE)
+		set(GIT_VERSION_SUFFIX "${CMAKE_MATCH_5}" PARENT_SCOPE)
+	endif()
+
+	string(TIMESTAMP VERSION_TIMESTAMP "%Y-%m-%d %H:%M:%S")
+	set(VERSION_TIMESTAMP "${VERSION_TIMESTAMP}" PARENT_SCOPE)
+
+	set(GIT_VERSION "${_git_version}") # required for version_show()
 	version_show()
 endfunction()
 
@@ -136,43 +142,6 @@ function(version_generate)
 	if(NOT DEFINED ${GIT_VERSION})
 		version_extract()
 	endif()
-
-	string(TIMESTAMP VERSION_TIMESTAMP "%Y-%m-%d %H:%M:%S")
-	set(VERSION_TIMESTAMP "${VERSION_TIMESTAMP}")
-	set(VERSION_TIMESTAMP
-		"${VERSION_TIMESTAMP}"
-		PARENT_SCOPE
-	)
-
-	if("${GIT_VERSION}" MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+([-+].*)?$")
-		set(GIT_VERSION_TRIPLET ${GIT_VERSION})
-		string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-+].*)?$" "\\1"
-			GIT_VERSION_MAJOR "${GIT_VERSION}"
-		)
-		string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-+].*)?$" "\\2"
-			GIT_VERSION_MINOR "${GIT_VERSION}"
-		)
-		string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-+].*)?$" "\\3"
-			GIT_VERSION_PATCH "${GIT_VERSION}"
-		)
-		string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\.([0-9]+)(([-+].*)?)$" "\\4"
-			GIT_VERSION_SUFFIX "${GIT_VERSION}"
-		)
-	else()
-		# Choose a high major number, such that it is always incompatible with existing
-		# tags.
-		set(GIT_VERSION_TRIPLET "9999.0.0")
-		set(GIT_VERSION_MAJOR 9999)
-		set(GIT_VERSION_MINOR 0)
-		set(GIT_VERSION_PATCH 0)
-		set(GIT_VERSION_SUFFIX "+${GIT_HASH_SHORT}")
-	endif()
-
-	set(GIT_VERSION_TRIPLET ${GIT_VERSION_TRIPLET} PARENT_SCOPE)
-	set(GIT_VERSION_MAJOR ${GIT_VERSION_MAJOR} PARENT_SCOPE)
-	set(GIT_VERSION_MINOR ${GIT_VERSION_MINOR} PARENT_SCOPE)
-	set(GIT_VERSION_PATCH ${GIT_VERSION_PATCH} PARENT_SCOPE)
-	set(GIT_VERSION_SUFFIX ${GIT_VERSION_SUFFIX} PARENT_SCOPE)
 
 	string(TOUPPER "${PROJECT_NAME}" PROJECT_NAME_UC)
 	string(REGEX REPLACE "[^A-Z0-9]+" "_" PROJECT_NAME_UC "${PROJECT_NAME_UC}")
@@ -188,9 +157,17 @@ function(version_generate)
 
 #This is a generated file. Do not edit.
 
-GIT_VERSION=\"${GIT_VERSION}\"
 GIT_HASH=\"${GIT_HASH}\"
+GIT_HASH_SHORT=\"${GIT_HASH_SHORT}\"
+GIT_VERSION=\"${GIT_VERSION}\"
 GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
+VERSION_TIMESTAMP=\"${VERSION_TIMESTAMP}\"
+
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>GIT_VERSION_TRIPLET=\"${GIT_VERSION_TRIPLET}\"
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>GIT_VERSION_MAJOR=${GIT_VERSION_MAJOR}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>GIT_VERSION_MINOR=${GIT_VERSION_MINOR}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>GIT_VERSION_PATCH=${GIT_VERSION_PATCH}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>GIT_VERSION_SUFFIX=\"${GIT_VERSION_SUFFIX}\"
 "
 	)
 
@@ -199,9 +176,17 @@ GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
 		OUTPUT ${VERSION_SCRIPT_DIR}/version.ps1
 		CONTENT "#This is a generated file. Do not edit.
 
-$GIT_VERSION=\"${GIT_VERSION}\"
 $GIT_HASH=\"${GIT_HASH}\"
+$GIT_HASH_SHORT=\"${GIT_HASH_SHORT}\"
+$GIT_VERSION=\"${GIT_VERSION}\"
 $GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
+$VERSION_TIMESTAMP=\"${VERSION_TIMESTAMP}\"
+
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>$GIT_VERSION_TRIPLET=\"${GIT_VERSION_TRIPLET}\"
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>$GIT_VERSION_MAJOR=${GIT_VERSION_MAJOR}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>$GIT_VERSION_MINOR=${GIT_VERSION_MINOR}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>$GIT_VERSION_PATCH=${GIT_VERSION_PATCH}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>$GIT_VERSION_SUFFIX=\"${GIT_VERSION_SUFFIX}\"
 "
 	)
 
@@ -214,14 +199,17 @@ $GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
 
 /* This is a generated file. Do not edit. */
 
-#define ${PROJECT_NAME_UC}_VERSION_HASH    \"${GIT_HASH}\"
+#define ${PROJECT_NAME_UC}_HASH            \"${GIT_HASH}\"
+#define ${PROJECT_NAME_UC}_HASH_SHORT      \"${GIT_HASH_SHORT}\"
 #define ${PROJECT_NAME_UC}_VERSION         \"${GIT_VERSION}\"
+#define ${PROJECT_NAME_UC}_VERSION_PATH    \"${GIT_PATH}\"
 #define ${PROJECT_NAME_UC}_TIMESTAMP       \"${VERSION_TIMESTAMP}\"
 
-#define ${PROJECT_NAME_UC}_VERSION_MAJOR    ${GIT_VERSION_MAJOR}
-#define ${PROJECT_NAME_UC}_VERSION_MINOR    ${GIT_VERSION_MINOR}
-#define ${PROJECT_NAME_UC}_VERSION_PATCH    ${GIT_VERSION_PATCH}
-#define ${PROJECT_NAME_UC}_VERSION_SUFFIX  \"${GIT_VERSION_SUFFIX}\"
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>://>#define ${PROJECT_NAME_UC}_VERSION_TRIPLET \"${GIT_VERSION_TRIPLET}\"
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>://>#define ${PROJECT_NAME_UC}_VERSION_MAJOR    ${GIT_VERSION_MAJOR}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>://>#define ${PROJECT_NAME_UC}_VERSION_MINOR    ${GIT_VERSION_MINOR}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>://>#define ${PROJECT_NAME_UC}_VERSION_PATCH    ${GIT_VERSION_PATCH}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>://>#define ${PROJECT_NAME_UC}_VERSION_SUFFIX  \"${GIT_VERSION_SUFFIX}\"
 
 #endif // ${PROJECT_NAME_UC}_VERSION_H
     // clang-format on
