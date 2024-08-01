@@ -42,7 +42,9 @@ Major Changes include:
 	- [`sbom_add_package`](#sbom_add_package)
 	- [`sbom_add_external`](#sbom_add_external)
 	- [`sbom_finalize`](#sbom_finalize)
-- [Version extraction](#version-extraction)
+- [Version Extraction](#version-extraction)
+	- [`version_extract()`](#version_extract)
+	- [`version_generate()`](#version_generate)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
 
@@ -304,33 +306,48 @@ sbom_finalize()
 
 ---
 
-## Version extraction
+## Version Extraction
 
-Version extraction is included in the `sbom.cmake`. Calling `version_extract()` will set the following variables in the current scope for the current project:
+Version extraction is included in the `sbom.cmake` and used by the `sbom_generate()` function to fill in the version information in the SPDX document. It is also available for use in your project.
+
+### `version_extract()`
+
+This function sets the following variables in the current scope for the current project:
 
 - `GIT_HASH`: The full Git hash.
 - `GIT_HASH_SHORT`: The short Git hash.
-- `GIT_HASH_<tag>`: The full Git hash for the given tag.
-- `GIT_VERSION`: The Git tag, or a combination of the branch and hash if there is no tag set for the current commit.
-- `GIT_VERSION_PATH`: `GIT_VERSION`, but safe to be used in file names.
-- `GIT_VERSION_TRIPLET`: A major.minor.patch triplet, extracted from the current tag. For this, the tag shall adhere to [Semantic Versioning 2.0.0](https://semver.org/), optionally prefixed with `v`.
+- `GIT_VERSION`:
+  - If the current commit is tagged, the tag name: `v1.2.3`
+  - If not tagged, `git-describe+branch`: `v1.2.3-4-g1234567+feature/xyz`
+  - If dirty, a `+dirty` suffix is added in both cases: `v1.2.3-4-g1234567+feature/xyz+dirty` or `v1.2.3+dirty`
+    - We want to be very particular about what is considered dirty, so even untracked files are considered dirty.
+- `GIT_VERSION_PATH`:
+  - The value of `GIT_VERSION`, but safe to use in file names.
+  - E.g., `v1.2.3-4-g1234567+feature/xyz+dirty` becomes `v1.2.3-4-g1234567+feature_xyz+dirty`
+- `VERSION_TIMESTAMP`: The current build time.
+
+Additionally, if `GIT_VERSION` starts with a tag that adheres to [Semantic Versioning 2.0.0](https://semver.org/) (optionally prefixed with `v`), the following variables are set:
+
+- `GIT_VERSION_TRIPLET`: A major.minor.patch triplet, extracted from `GIT_VERSION`.
+  - e.g., `v1.2.3-4-g1234567+feature/xyz+dirty` -> `1.2.3`
 - `GIT_VERSION_MAJOR`: The major part of `GIT_VERSION_TRIPLET`.
 - `GIT_VERSION_MINOR`: The minor part of `GIT_VERSION_TRIPLET`.
 - `GIT_VERSION_PATCH`: The patch part of `GIT_VERSION_TRIPLET`.
-- `GIT_VERSION_SUFFIX`: Everything after the triplet of `GIT_VERSION_TRIPLET`.
-- `VERSION_TIMESTAMP`: The current build time.
+- `GIT_VERSION_SUFFIX`: Everything after the triplet in `GIT_VERSION`.
+  - - e.g., `v1.2.3-4-g1234567+feature/xyz+dirty` -> `-4-g1234567+feature/xyz+dirty`
 
-*Note:* `sbom_generate()` will call `version_extract()` internally.
+### `version_generate()`
 
-Additionally, you can call `version_generate()` to generate:
+This function generates the following files, containing the above-mentioned variables:
 
-- `${PROJECT_BINARY_DIR}/version.[sh|ps1]`: A shell file that sets `GIT_VERSION`, `GIT_VERSION_PATH`, and `GIT_HASH`.
-- `${PROJECT_BINARY_DIR}/version.txt`: A text file that contains `GIT_VERSION`.
-- `${PROJECT_NAME}-version` interface library target: When linking to this target, one can access the version information in C/C++ by including the `<${PROJECT_NAME}-version.h>` header file. The file is generated in `${PROJECT_BINARY_DIR}/include`.
+- `version.[sh|ps1]`: Script files that set the variables in the environment.
+- `version.txt`: A text file for documentation purposes.
+  - This file only contains the `GIT_VERSION` variable.
+- `${PROJECT_NAME}-version`: An interface library target that provides a single header file `${PROJECT_NAME}-version.h`.
+  - **Note:** The variables are prefixed with `${PROJECT_NAME}_` instead of `GIT_`.
+  - Link the target `${PROJECT_NAME}-version` and include `${PROJECT_NAME}-version.h` to access the version information in C/C++. [(example)](example/CMakeLists.txt).
 
-*Note:* `version_generate()` will internally call `version_extract().`
-
----
+All files are generated in `${PROJECT_BINARY_DIR}/version/[scripts|include|doc]`. The CMake variables `VERSION_SCRIPT_DIR`, `VERSION_INC_DIR`, and `VERSION_DOC_DIR` point to these directories.
 
 ## License
 
