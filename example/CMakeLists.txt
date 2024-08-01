@@ -48,7 +48,7 @@ install(TARGETS example RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 sbom_add_target(example)
 
 # Install some other documentation (the version in this case).
-install(FILES ${PROJECT_BINARY_DIR}/version.txt DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/example)
+install(FILES ${VERSION_DOC_DIR}/version.txt DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/example)
 
 # Mention the version file in the SBOM.
 sbom_add_file(${CMAKE_INSTALL_DATAROOTDIR}/example/version.txt FILETYPE DOCUMENTATION TEXT)

@@ -204,9 +204,13 @@ function(version_generate)
 	string(TOUPPER "${PROJECT_NAME}" PROJECT_NAME_UC)
 	string(REGEX REPLACE "[^A-Z0-9]+" "_" PROJECT_NAME_UC "${PROJECT_NAME_UC}")
 
+	set(VERSION_DOC_DIR ${PROJECT_BINARY_DIR}/version/doc)
+	set(VERSION_INC_DIR ${PROJECT_BINARY_DIR}/version/include)
+	set(VERSION_SCRIPTS_DIR ${PROJECT_BINARY_DIR}/version/scripts)
+
 	file(
 		GENERATE
-		OUTPUT ${PROJECT_BINARY_DIR}/version.sh
+		OUTPUT ${VERSION_SCRIPTS_DIR}/version.sh
 		CONTENT "#!/bin/bash
 
 #This is a generated file. Do not edit.
@@ -219,8 +223,8 @@ GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
 
 	file(
 		GENERATE
-		OUTPUT ${PROJECT_BINARY_DIR}/version.ps1
 		CONTENT "#!/bin/bash
+		OUTPUT ${VERSION_SCRIPTS_DIR}/version.ps1
 
 #This is a generated file. Do not edit.
 
@@ -232,7 +236,7 @@ $GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
 
 	file(
 		GENERATE
-		OUTPUT ${PROJECT_BINARY_DIR}/include/${PROJECT_NAME}_version.h
+		OUTPUT ${VERSION_INC_DIR}/${PROJECT_NAME}_version.h
 		CONTENT "// clang-format off
 #ifndef ${PROJECT_NAME_UC}_VERSION_H
 #define ${PROJECT_NAME_UC}_VERSION_H
@@ -266,16 +270,21 @@ $GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
 "
 	)
 
-	file(WRITE ${PROJECT_BINARY_DIR}/version.txt "${GIT_VERSION}")
+	file(WRITE ${VERSION_DOC_DIR}/version.txt "${GIT_VERSION}")
 
 	if(NOT TARGET ${PROJECT_NAME}-version)
 		add_library(${PROJECT_NAME}-version INTERFACE)
 
 		target_include_directories(${PROJECT_NAME}-version INTERFACE
-			"$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>"
+			"$<BUILD_INTERFACE:${VERSION_INC_DIR}>"
 			"$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 		)
 	endif()
+
+	set(VERSION_DOC_DIR ${VERSION_DOC_DIR} PARENT_SCOPE)
+	set(VERSION_INC_DIR ${VERSION_INC_DIR} PARENT_SCOPE)
+	set(VERSION_SCRIPTS_DIR ${VERSION_SCRIPTS_DIR} PARENT_SCOPE)
+
 endfunction()
 
 # Common Platform Enumeration: https://nvd.nist.gov/products/cpe
