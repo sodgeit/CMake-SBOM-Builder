@@ -39,7 +39,7 @@ sbom_generate(
 version_generate()
 
 add_executable(example example.cpp)
-target_link_libraries(example example-project-version)
+target_link_libraries(example ${PROJECT_NAME}-version)
 
 # Install the application.
 install(TARGETS example RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

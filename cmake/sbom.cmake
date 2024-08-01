@@ -206,11 +206,11 @@ function(version_generate)
 
 	set(VERSION_DOC_DIR ${PROJECT_BINARY_DIR}/version/doc)
 	set(VERSION_INC_DIR ${PROJECT_BINARY_DIR}/version/include)
-	set(VERSION_SCRIPTS_DIR ${PROJECT_BINARY_DIR}/version/scripts)
+	set(VERSION_SCRIPT_DIR ${PROJECT_BINARY_DIR}/version/scripts)
 
 	file(
 		GENERATE
-		OUTPUT ${VERSION_SCRIPTS_DIR}/version.sh
+		OUTPUT ${VERSION_SCRIPT_DIR}/version.sh
 		CONTENT "#!/bin/bash
 
 #This is a generated file. Do not edit.
@@ -223,7 +223,7 @@ GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
 
 	file(
 		GENERATE
-		OUTPUT ${VERSION_SCRIPTS_DIR}/version.ps1
+		OUTPUT ${VERSION_SCRIPT_DIR}/version.ps1
 		CONTENT "#This is a generated file. Do not edit.
 
 $GIT_VERSION=\"${GIT_VERSION}\"
@@ -281,7 +281,7 @@ $GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
 
 	set(VERSION_DOC_DIR ${VERSION_DOC_DIR} PARENT_SCOPE)
 	set(VERSION_INC_DIR ${VERSION_INC_DIR} PARENT_SCOPE)
-	set(VERSION_SCRIPTS_DIR ${VERSION_SCRIPTS_DIR} PARENT_SCOPE)
+	set(VERSION_SCRIPT_DIR ${VERSION_SCRIPT_DIR} PARENT_SCOPE)
 
 endfunction()
 
