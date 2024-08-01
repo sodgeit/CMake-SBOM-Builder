@@ -45,6 +45,7 @@ Major Changes include:
 - [Version Extraction](#version-extraction)
 	- [`version_extract()`](#version_extract)
 	- [`version_generate()`](#version_generate)
+- [Compatibility Strategy](#compatibility-strategy)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
 
@@ -348,6 +349,20 @@ This function generates the following files, containing the above-mentioned vari
   - Link the target `${PROJECT_NAME}-version` and include `${PROJECT_NAME}-version.h` to access the version information in C/C++. [(example)](example/CMakeLists.txt).
 
 All files are generated in `${PROJECT_BINARY_DIR}/version/[scripts|include|doc]`. The CMake variables `VERSION_SCRIPT_DIR`, `VERSION_INC_DIR`, and `VERSION_DOC_DIR` point to these directories.
+
+---
+
+## Compatibility Strategy
+
+CMake frequently releases new features and improvements, and sometimes deprecates or supersedes old features. To ensure our script remains functional and takes advantage of these updates, we will update our minimum required CMake version in line with the oldest supported Ubuntu LTS release.
+
+As of the time of writing, the oldest supported Ubuntu LTS release is Ubuntu 20.04, which includes CMake version 3.16. When support for Ubuntu 20.04 is dropped in May 2025, we will update our minimum required to align with the next oldest supported Ubuntu LTS release. (Ubuntu 22.04, which includes CMake version 3.22)
+
+Our testing strategy will also be aligned with this approach.
+
+We believe this approach strikes a balance between ensuring broad compatibility for users on stable and long-term platforms and leveraging updated features and improvements in CMake.
+
+---
 
 ## License
 
