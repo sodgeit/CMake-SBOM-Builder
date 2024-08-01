@@ -26,69 +26,78 @@ function(version_extract)
 		return()
 	endif()
 
-	set(version_git_head "unknown")
-	set(version_git_hash "")
-	set(version_git_branch "dev")
-	set(version_git_tag "")
+	set(_git_short_hash "unknown")
+	set(_git_full_hash "unknown")
+	set(_git_branch "none")
+	set(_git_describe "v0.0.0-0-g${_git_short_hash}")
+	set(_git_tag "v0.0.0")
+	set(_git_dirty "")
 
 	if(Git_FOUND)
 		execute_process(
 			COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
 			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-			OUTPUT_VARIABLE version_git_head
+			OUTPUT_VARIABLE _git_short_hash
 			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
 		)
 
 		execute_process(
 			COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
 			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-			OUTPUT_VARIABLE version_git_hash
+			OUTPUT_VARIABLE _git_full_hash
 			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
 		)
 
 		execute_process(
 			COMMAND ${GIT_EXECUTABLE} rev-parse --abbrev-ref HEAD
 			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-			OUTPUT_VARIABLE version_git_branch
+			OUTPUT_VARIABLE _git_branch
 			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
 		)
 
-		if("${version_git_branch}" STREQUAL "HEAD")
+		if("${_git_branch}" STREQUAL "HEAD")
 			if(NOT "$ENV{CI_COMMIT_BRANCH}" STREQUAL "")
 				# Probably a detached head running on a gitlab runner
-				set(version_git_branch "$ENV{CI_COMMIT_BRANCH}")
+				set(_git_branch "$ENV{CI_COMMIT_BRANCH}")
 			endif()
+		endif()
+
+		execute_process(
+			COMMAND ${GIT_EXECUTABLE} describe --tags
+			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+			OUTPUT_VARIABLE _git_describe
+			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
+		)
+
+		# don't rely on git describe for dirty status
+		# we want to be really picky and include untracked files in the dirty check
+		execute_process(
+			COMMAND ${GIT_EXECUTABLE} status -s
+			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+			OUTPUT_VARIABLE _git_dirty
+			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
+		)
+		if(NOT "${_git_dirty}" STREQUAL "")
+			set(_git_dirty "+dirty")
 		endif()
 
 		execute_process(
 			COMMAND ${GIT_EXECUTABLE} tag --points-at HEAD
 			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-			OUTPUT_VARIABLE version_git_tag
+			OUTPUT_VARIABLE _git_tag
 			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
 		)
 
-		string(REGEX REPLACE "[ \t\r\n].*$" "" version_git_tag "${version_git_tag}")
+		string(REGEX REPLACE "[ \t\r\n].*$" "" _git_tag "${_git_tag}")
 
-		if("${version_git_tag}" STREQUAL "")
+		if("${_git_tag}" STREQUAL "")
 			if(NOT "$ENV{CI_COMMIT_TAG}" STREQUAL "")
 				# Probably a detached head running on a gitlab runner
-				set(version_git_tag "$ENV{CI_COMMIT_TAG}")
+				set(_git_tag "$ENV{CI_COMMIT_TAG}")
 			endif()
 		endif()
-
-		execute_process(
-			COMMAND ${GIT_EXECUTABLE} status -s
-			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-			OUTPUT_VARIABLE version_git_dirty
-			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
-		)
-
-		if(NOT "${version_git_dirty}" STREQUAL "")
-			set(version_git_dirty "+dirty")
-		endif()
-
 	else()
-		message(WARNING "Git not found")
+		message(WARNING "Git not found. Version information will use placeholders.")
 	endif()
 
 	if("$ENV{CI_BUILD_ID}" STREQUAL "")
@@ -97,20 +106,20 @@ function(version_extract)
 		set(version_build "+build$ENV{CI_BUILD_ID}")
 	endif()
 
-	set(GIT_HASH "${version_git_hash}" PARENT_SCOPE)
-	set(GIT_HASH_SHORT "${version_git_head}" PARENT_SCOPE)
+	set(GIT_HASH "${_git_full_hash}" PARENT_SCOPE)
+	set(GIT_HASH_SHORT "${_git_short_hash}" PARENT_SCOPE)
 
-	if(NOT ${version_git_tag} STREQUAL "")
-		set(_GIT_VERSION "${version_git_tag}")
+	if(NOT ${_git_tag} STREQUAL "")
+		set(_GIT_VERSION "${_git_tag}")
 
 		if("${_GIT_VERSION}" MATCHES "^v[0-9]+\.")
 			string(REGEX REPLACE "^v" "" _GIT_VERSION "${_GIT_VERSION}")
 		endif()
 
-		set(GIT_VERSION "${_GIT_VERSION}${version_git_dirty}")
+		set(GIT_VERSION "${_GIT_VERSION}${_git_dirty}")
 	else()
 		set(GIT_VERSION
-			"${version_git_head}+${version_git_branch}${version_build}${version_git_dirty}"
+			"${_git_short_hash}+${_git_branch}${version_build}${_git_dirty}"
 		)
 	endif()
 
