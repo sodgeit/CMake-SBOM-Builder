@@ -22,11 +22,6 @@ endfunction()
 
 # Extract version information from Git of the current project.
 function(version_extract)
-	set(options VERBOSE)
-	cmake_parse_arguments(
-		VERSION_EXTRACT "${options}" "" "" ${ARGN}
-	)
-
 	if(DEFINED GIT_VERSION)
 		return()
 	endif()
@@ -92,35 +87,6 @@ function(version_extract)
 			set(version_git_dirty "+dirty")
 		endif()
 
-		macro(git_hash TAG TAG_VAR)
-			execute_process(
-				COMMAND ${GIT_EXECUTABLE} rev-parse ${TAG}
-				WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-				OUTPUT_VARIABLE ${TAG_VAR}_
-				ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
-			)
-
-			set(${TAG_VAR} "${${TAG_VAR}_}" PARENT_SCOPE)
-		endmacro()
-
-		execute_process(
-			COMMAND ${GIT_EXECUTABLE} tag
-			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-			OUTPUT_VARIABLE GIT_TAGS
-			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
-		)
-
-		if(GIT_TAGS)
-			string(REGEX REPLACE "[ \t\r\n]+" ";" GIT_TAGS_LIST ${GIT_TAGS})
-
-			foreach(tag IN LISTS GIT_TAGS_LIST)
-				git_hash(${tag} GIT_HASH_${tag})
-
-				if(VERSION_EXTRACT_VERBOSE)
-					message(STATUS "git hash of tag ${tag} is ${GIT_HASH_${tag}}")
-				endif()
-			endforeach()
-		endif()
 	else()
 		message(WARNING "Git not found")
 	endif()
@@ -152,9 +118,7 @@ function(version_extract)
 	string(REGEX REPLACE "[^-a-zA-Z0-9_.]+" "+" _GIT_VERSION_PATH "${GIT_VERSION}")
 	set(GIT_VERSION_PATH "${_GIT_VERSION_PATH}" PARENT_SCOPE)
 
-	if(VERSION_EXTRACT_VERBOSE)
-		version_show()
-	endif()
+	version_show()
 endfunction()
 
 # Generate version files and a static library based on the extract version information of the
@@ -249,19 +213,6 @@ $GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
 #define ${PROJECT_NAME_UC}_VERSION_MINOR    ${GIT_VERSION_MINOR}
 #define ${PROJECT_NAME_UC}_VERSION_PATCH    ${GIT_VERSION_PATCH}
 #define ${PROJECT_NAME_UC}_VERSION_SUFFIX  \"${GIT_VERSION_SUFFIX}\"
-
-#if ${PROJECT_NAME_UC}_VERSION_MINOR >= 100L
-#  error ${PROJECT_NAME_UC}_VERSION_MINOR (${GIT_VERSION_MINOR}) too large.
-#endif
-
-#if ${PROJECT_NAME_UC}_VERSION_PATCH >= 100L
-#  error ${PROJECT_NAME_UC}_VERSION_PATCH (${GIT_VERSION_PATCH}) too large.
-#endif
-
-#define ${PROJECT_NAME_UC}_VERSION_NUM           \\
-	(${PROJECT_NAME_UC}_VERSION_MAJOR * 10000L + \\
-	 ${PROJECT_NAME_UC}_VERSION_MINOR * 100L +   \\
-	 ${PROJECT_NAME_UC}_VERSION_PATCH * 1L)
 
 #endif // ${PROJECT_NAME_UC}_VERSION_H
     // clang-format on

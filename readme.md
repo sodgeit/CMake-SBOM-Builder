@@ -310,7 +310,6 @@ Version extraction is included in the `sbom.cmake`. Calling `version_extract()` 
 
 - `GIT_HASH`: The full Git hash.
 - `GIT_HASH_SHORT`: The short Git hash.
-- `GIT_HASH_<tag>`: The full Git hash for the given tag.
 - `GIT_VERSION`: The Git tag, or a combination of the branch and hash if there is no tag set for the current commit.
 - `GIT_VERSION_PATH`: The value of `GIT_VERSION`, but safe to use in file names.
 - `GIT_VERSION_TRIPLET`: A major.minor.patch triplet, extracted from the current tag. For this, the tag shall adhere to [Semantic Versioning 2.0.0](https://semver.org/), optionally prefixed with `v`.
