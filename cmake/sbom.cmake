@@ -22,107 +22,82 @@ endfunction()
 
 # Extract version information from Git of the current project.
 function(version_extract)
-	set(options VERBOSE)
-	cmake_parse_arguments(
-		VERSION_EXTRACT "${options}" "" "" ${ARGN}
-	)
-
 	if(DEFINED GIT_VERSION)
 		return()
 	endif()
 
-	set(version_git_head "unknown")
-	set(version_git_hash "")
-	set(version_git_branch "dev")
-	set(version_git_tag "")
+	set(_git_short_hash "unknown")
+	set(_git_full_hash "unknown")
+	set(_git_branch "none")
+	set(_git_describe "v0.0.0-0-g${_git_short_hash}")
+	set(_git_tag "v0.0.0")
+	set(_git_dirty "")
 
 	if(Git_FOUND)
 		execute_process(
 			COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
 			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-			OUTPUT_VARIABLE version_git_head
+			OUTPUT_VARIABLE _git_short_hash
 			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
 		)
 
 		execute_process(
 			COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
 			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-			OUTPUT_VARIABLE version_git_hash
+			OUTPUT_VARIABLE _git_full_hash
 			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
 		)
 
 		execute_process(
 			COMMAND ${GIT_EXECUTABLE} rev-parse --abbrev-ref HEAD
 			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-			OUTPUT_VARIABLE version_git_branch
+			OUTPUT_VARIABLE _git_branch
 			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
 		)
 
-		if("${version_git_branch}" STREQUAL "HEAD")
+		if("${_git_branch}" STREQUAL "HEAD")
 			if(NOT "$ENV{CI_COMMIT_BRANCH}" STREQUAL "")
 				# Probably a detached head running on a gitlab runner
-				set(version_git_branch "$ENV{CI_COMMIT_BRANCH}")
+				set(_git_branch "$ENV{CI_COMMIT_BRANCH}")
 			endif()
+		endif()
+
+		execute_process(
+			COMMAND ${GIT_EXECUTABLE} describe --tags
+			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+			OUTPUT_VARIABLE _git_describe
+			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
+		)
+
+		# don't rely on git describe for dirty status
+		# we want to be really picky and include untracked files in the dirty check
+		execute_process(
+			COMMAND ${GIT_EXECUTABLE} status -s
+			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+			OUTPUT_VARIABLE _git_dirty
+			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
+		)
+		if(NOT "${_git_dirty}" STREQUAL "")
+			set(_git_dirty "+dirty")
 		endif()
 
 		execute_process(
 			COMMAND ${GIT_EXECUTABLE} tag --points-at HEAD
 			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-			OUTPUT_VARIABLE version_git_tag
+			OUTPUT_VARIABLE _git_tag
 			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
 		)
 
-		string(REGEX REPLACE "[ \t\r\n].*$" "" version_git_tag "${version_git_tag}")
+		string(REGEX REPLACE "[ \t\r\n].*$" "" _git_tag "${_git_tag}")
 
-		if("${version_git_tag}" STREQUAL "")
+		if("${_git_tag}" STREQUAL "")
 			if(NOT "$ENV{CI_COMMIT_TAG}" STREQUAL "")
 				# Probably a detached head running on a gitlab runner
-				set(version_git_tag "$ENV{CI_COMMIT_TAG}")
+				set(_git_tag "$ENV{CI_COMMIT_TAG}")
 			endif()
 		endif()
-
-		execute_process(
-			COMMAND ${GIT_EXECUTABLE} status -s
-			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-			OUTPUT_VARIABLE version_git_dirty
-			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
-		)
-
-		if(NOT "${version_git_dirty}" STREQUAL "")
-			set(version_git_dirty "+dirty")
-		endif()
-
-		macro(git_hash TAG TAG_VAR)
-			execute_process(
-				COMMAND ${GIT_EXECUTABLE} rev-parse ${TAG}
-				WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-				OUTPUT_VARIABLE ${TAG_VAR}_
-				ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
-			)
-
-			set(${TAG_VAR} "${${TAG_VAR}_}" PARENT_SCOPE)
-		endmacro()
-
-		execute_process(
-			COMMAND ${GIT_EXECUTABLE} tag
-			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-			OUTPUT_VARIABLE GIT_TAGS
-			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
-		)
-
-		if(GIT_TAGS)
-			string(REGEX REPLACE "[ \t\r\n]+" ";" GIT_TAGS_LIST ${GIT_TAGS})
-
-			foreach(tag IN LISTS GIT_TAGS_LIST)
-				git_hash(${tag} GIT_HASH_${tag})
-
-				if(VERSION_EXTRACT_VERBOSE)
-					message(STATUS "git hash of tag ${tag} is ${GIT_HASH_${tag}}")
-				endif()
-			endforeach()
-		endif()
 	else()
-		message(WARNING "Git not found")
+		message(WARNING "Git not found. Version information will use placeholders.")
 	endif()
 
 	if("$ENV{CI_BUILD_ID}" STREQUAL "")
@@ -131,30 +106,34 @@ function(version_extract)
 		set(version_build "+build$ENV{CI_BUILD_ID}")
 	endif()
 
-	set(GIT_HASH "${version_git_hash}" PARENT_SCOPE)
-	set(GIT_HASH_SHORT "${version_git_head}" PARENT_SCOPE)
-
-	if(NOT ${version_git_tag} STREQUAL "")
-		set(_GIT_VERSION "${version_git_tag}")
-
-		if("${_GIT_VERSION}" MATCHES "^v[0-9]+\.")
-			string(REGEX REPLACE "^v" "" _GIT_VERSION "${_GIT_VERSION}")
-		endif()
-
-		set(GIT_VERSION "${_GIT_VERSION}${version_git_dirty}")
+	# HEAD points directly to a tag
+	if(NOT ${_git_tag} STREQUAL "")
+		set(_git_version "${_git_tag}")
 	else()
-		set(GIT_VERSION
-			"${version_git_head}+${version_git_branch}${version_build}${version_git_dirty}"
-		)
+		set(_git_version "${_git_describe}+${_git_branch}${version_build}")
 	endif()
 
-	set(GIT_VERSION "${GIT_VERSION}" PARENT_SCOPE)
-	string(REGEX REPLACE "[^-a-zA-Z0-9_.]+" "+" _GIT_VERSION_PATH "${GIT_VERSION}")
-	set(GIT_VERSION_PATH "${_GIT_VERSION_PATH}" PARENT_SCOPE)
+	set(_git_version "${_git_version}${_git_dirty}")
 
-	if(VERSION_EXTRACT_VERBOSE)
-		version_show()
+	set(GIT_HASH "${_git_full_hash}" PARENT_SCOPE)
+	set(GIT_HASH_SHORT "${_git_short_hash}" PARENT_SCOPE)
+	set(GIT_VERSION "${_git_version}" PARENT_SCOPE)
+	string(REGEX REPLACE "[^-a-zA-Z0-9_.+]+" "_" _git_version_path "${_git_version}")
+	set(GIT_VERSION_PATH "${_git_version_path}" PARENT_SCOPE)
+
+	if(_git_version MATCHES "^(v)?([0-9]+)\\.([0-9]+)\\.([0-9]+)(.+)$")
+		set(GIT_VERSION_TRIPLET "${CMAKE_MATCH_2}.${CMAKE_MATCH_3}.${CMAKE_MATCH_4}" PARENT_SCOPE)
+		set(GIT_VERSION_MAJOR "${CMAKE_MATCH_2}" PARENT_SCOPE)
+		set(GIT_VERSION_MINOR "${CMAKE_MATCH_3}" PARENT_SCOPE)
+		set(GIT_VERSION_PATCH "${CMAKE_MATCH_4}" PARENT_SCOPE)
+		set(GIT_VERSION_SUFFIX "${CMAKE_MATCH_5}" PARENT_SCOPE)
 	endif()
+
+	string(TIMESTAMP VERSION_TIMESTAMP "%Y-%m-%d %H:%M:%S")
+	set(VERSION_TIMESTAMP "${VERSION_TIMESTAMP}" PARENT_SCOPE)
+
+	set(GIT_VERSION "${_git_version}") # required for version_show()
+	version_show()
 endfunction()
 
 # Generate version files and a static library based on the extract version information of the
@@ -163,43 +142,6 @@ function(version_generate)
 	if(NOT DEFINED ${GIT_VERSION})
 		version_extract()
 	endif()
-
-	string(TIMESTAMP VERSION_TIMESTAMP "%Y-%m-%d %H:%M:%S")
-	set(VERSION_TIMESTAMP "${VERSION_TIMESTAMP}")
-	set(VERSION_TIMESTAMP
-		"${VERSION_TIMESTAMP}"
-		PARENT_SCOPE
-	)
-
-	if("${GIT_VERSION}" MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+([-+].*)?$")
-		set(GIT_VERSION_TRIPLET ${GIT_VERSION})
-		string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-+].*)?$" "\\1"
-			GIT_VERSION_MAJOR "${GIT_VERSION}"
-		)
-		string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-+].*)?$" "\\2"
-			GIT_VERSION_MINOR "${GIT_VERSION}"
-		)
-		string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-+].*)?$" "\\3"
-			GIT_VERSION_PATCH "${GIT_VERSION}"
-		)
-		string(REGEX REPLACE "^([0-9]+)\\.([0-9]+)\\.([0-9]+)(([-+].*)?)$" "\\4"
-			GIT_VERSION_SUFFIX "${GIT_VERSION}"
-		)
-	else()
-		# Choose a high major number, such that it is always incompatible with existing
-		# tags.
-		set(GIT_VERSION_TRIPLET "9999.0.0")
-		set(GIT_VERSION_MAJOR 9999)
-		set(GIT_VERSION_MINOR 0)
-		set(GIT_VERSION_PATCH 0)
-		set(GIT_VERSION_SUFFIX "+${GIT_HASH_SHORT}")
-	endif()
-
-	set(GIT_VERSION_TRIPLET ${GIT_VERSION_TRIPLET} PARENT_SCOPE)
-	set(GIT_VERSION_MAJOR ${GIT_VERSION_MAJOR} PARENT_SCOPE)
-	set(GIT_VERSION_MINOR ${GIT_VERSION_MINOR} PARENT_SCOPE)
-	set(GIT_VERSION_PATCH ${GIT_VERSION_PATCH} PARENT_SCOPE)
-	set(GIT_VERSION_SUFFIX ${GIT_VERSION_SUFFIX} PARENT_SCOPE)
 
 	string(TOUPPER "${PROJECT_NAME}" PROJECT_NAME_UC)
 	string(REGEX REPLACE "[^A-Z0-9]+" "_" PROJECT_NAME_UC "${PROJECT_NAME_UC}")
@@ -215,9 +157,17 @@ function(version_generate)
 
 #This is a generated file. Do not edit.
 
-GIT_VERSION=\"${GIT_VERSION}\"
 GIT_HASH=\"${GIT_HASH}\"
+GIT_HASH_SHORT=\"${GIT_HASH_SHORT}\"
+GIT_VERSION=\"${GIT_VERSION}\"
 GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
+VERSION_TIMESTAMP=\"${VERSION_TIMESTAMP}\"
+
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>GIT_VERSION_TRIPLET=\"${GIT_VERSION_TRIPLET}\"
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>GIT_VERSION_MAJOR=${GIT_VERSION_MAJOR}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>GIT_VERSION_MINOR=${GIT_VERSION_MINOR}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>GIT_VERSION_PATCH=${GIT_VERSION_PATCH}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>GIT_VERSION_SUFFIX=\"${GIT_VERSION_SUFFIX}\"
 "
 	)
 
@@ -226,9 +176,17 @@ GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
 		OUTPUT ${VERSION_SCRIPT_DIR}/version.ps1
 		CONTENT "#This is a generated file. Do not edit.
 
-$GIT_VERSION=\"${GIT_VERSION}\"
 $GIT_HASH=\"${GIT_HASH}\"
+$GIT_HASH_SHORT=\"${GIT_HASH_SHORT}\"
+$GIT_VERSION=\"${GIT_VERSION}\"
 $GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
+$VERSION_TIMESTAMP=\"${VERSION_TIMESTAMP}\"
+
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>$GIT_VERSION_TRIPLET=\"${GIT_VERSION_TRIPLET}\"
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>$GIT_VERSION_MAJOR=${GIT_VERSION_MAJOR}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>$GIT_VERSION_MINOR=${GIT_VERSION_MINOR}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>$GIT_VERSION_PATCH=${GIT_VERSION_PATCH}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>:#>$GIT_VERSION_SUFFIX=\"${GIT_VERSION_SUFFIX}\"
 "
 	)
 
@@ -241,27 +199,17 @@ $GIT_VERSION_PATH=\"${GIT_VERSION_PATH}\"
 
 /* This is a generated file. Do not edit. */
 
-#define ${PROJECT_NAME_UC}_VERSION_HASH    \"${GIT_HASH}\"
+#define ${PROJECT_NAME_UC}_HASH            \"${GIT_HASH}\"
+#define ${PROJECT_NAME_UC}_HASH_SHORT      \"${GIT_HASH_SHORT}\"
 #define ${PROJECT_NAME_UC}_VERSION         \"${GIT_VERSION}\"
+#define ${PROJECT_NAME_UC}_VERSION_PATH    \"${GIT_PATH}\"
 #define ${PROJECT_NAME_UC}_TIMESTAMP       \"${VERSION_TIMESTAMP}\"
 
-#define ${PROJECT_NAME_UC}_VERSION_MAJOR    ${GIT_VERSION_MAJOR}
-#define ${PROJECT_NAME_UC}_VERSION_MINOR    ${GIT_VERSION_MINOR}
-#define ${PROJECT_NAME_UC}_VERSION_PATCH    ${GIT_VERSION_PATCH}
-#define ${PROJECT_NAME_UC}_VERSION_SUFFIX  \"${GIT_VERSION_SUFFIX}\"
-
-#if ${PROJECT_NAME_UC}_VERSION_MINOR >= 100L
-#  error ${PROJECT_NAME_UC}_VERSION_MINOR (${GIT_VERSION_MINOR}) too large.
-#endif
-
-#if ${PROJECT_NAME_UC}_VERSION_PATCH >= 100L
-#  error ${PROJECT_NAME_UC}_VERSION_PATCH (${GIT_VERSION_PATCH}) too large.
-#endif
-
-#define ${PROJECT_NAME_UC}_VERSION_NUM           \\
-	(${PROJECT_NAME_UC}_VERSION_MAJOR * 10000L + \\
-	 ${PROJECT_NAME_UC}_VERSION_MINOR * 100L +   \\
-	 ${PROJECT_NAME_UC}_VERSION_PATCH * 1L)
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>://>#define ${PROJECT_NAME_UC}_VERSION_TRIPLET \"${GIT_VERSION_TRIPLET}\"
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>://>#define ${PROJECT_NAME_UC}_VERSION_MAJOR    ${GIT_VERSION_MAJOR}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>://>#define ${PROJECT_NAME_UC}_VERSION_MINOR    ${GIT_VERSION_MINOR}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>://>#define ${PROJECT_NAME_UC}_VERSION_PATCH    ${GIT_VERSION_PATCH}
+$<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>://>#define ${PROJECT_NAME_UC}_VERSION_SUFFIX  \"${GIT_VERSION_SUFFIX}\"
 
 #endif // ${PROJECT_NAME_UC}_VERSION_H
     // clang-format on
