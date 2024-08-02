@@ -931,30 +931,26 @@ function(sbom_add_external ID PATH)
 		GENERATE
 		OUTPUT ${_sbom_binary_dir}/${SBOM_EXTERNAL_SPDXID}.cmake
 		CONTENT
-		"
-			file(SHA1 \"${PATH}\" ext_sha1)
-			file(READ \"${PATH}\" ext_content)
-			if(\"${SBOM_EXTERNAL_RENAME}\" STREQUAL \"\")
-				get_filename_component(ext_name \"${PATH}\" NAME)
-				file(WRITE \"${sbom_dir}/\${ext_name}\" \"\${ext_content}\")
-			else()
-				file(WRITE \"${sbom_dir}/${SBOM_EXTERNAL_RENAME}\" \"\${ext_content}\")
-			endif()
+"file(SHA1 \"${PATH}\" ext_sha1)
+file(READ \"${PATH}\" ext_content)
+if(\"${SBOM_EXTERNAL_RENAME}\" STREQUAL \"\")
+	get_filename_component(ext_name \"${PATH}\" NAME)
+	file(WRITE \"${sbom_dir}/\${ext_name}\" \"\${ext_content}\")
+else()
+	file(WRITE \"${sbom_dir}/${SBOM_EXTERNAL_RENAME}\" \"\${ext_content}\")
+endif()
 
-			if(NOT \"\${ext_content}\" MATCHES \"[\\r\\n]DocumentNamespace:\")
-				message(FATAL_ERROR \"Missing DocumentNamespace in ${PATH}\")
-			endif()
+if(NOT \"\${ext_content}\" MATCHES \"[\\r\\n]DocumentNamespace:\")
+	message(FATAL_ERROR \"Missing DocumentNamespace in ${PATH}\")
+endif()
 
-			string(REGEX REPLACE \"^.*[\\r\\n]DocumentNamespace:[ \\t]*([^#\\r\\n]*).*$\"
-				\"\\\\1\" ext_ns \"\${ext_content}\")
+string(REGEX REPLACE
+	\"^.*[\\r\\n]DocumentNamespace:[ \\t]*([^#\\r\\n]*).*$\" \"\\\\1\" ext_ns \"\${ext_content}\")
 
-			list(APPEND SBOM_EXT_DOCS \"
-ExternalDocumentRef: ${SBOM_EXTERNAL_SPDXID} \${ext_ns} SHA1: \${ext_sha1}\")
+list(APPEND SBOM_EXT_DOCS \"ExternalDocumentRef: ${SBOM_EXTERNAL_SPDXID} \${ext_ns} SHA1: \${ext_sha1}\")
 
-			file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
-\"
-Relationship: ${SBOM_EXTERNAL_RELATIONSHIP}\")
-		"
+file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"Relationship: ${SBOM_EXTERNAL_RELATIONSHIP}\")
+"
 	)
 
 	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt
