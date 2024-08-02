@@ -609,9 +609,11 @@ function(sbom_add_file FILENAME)
 		)
 	endif()
 
+	get_property(_sbom_binary_dir GLOBAL PROPERTY SBOM_BINARY_DIR)
+
 	file(
 		GENERATE
-		OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_FILE_SPDXID}.cmake
+		OUTPUT ${_sbom_binary_dir}/${SBOM_FILE_SPDXID}.cmake
 		CONTENT
 		"
 cmake_policy(SET CMP0011 NEW)
@@ -647,7 +649,7 @@ endif()
 	"
 	)
 
-	install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_FILE_SPDXID}.cmake)
+	install(SCRIPT ${_sbom_binary_dir}/${SBOM_FILE_SPDXID}.cmake)
 
 	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
 endfunction()
@@ -723,9 +725,11 @@ function(sbom_add_directory PATH)
 		)
 	endif()
 
+	get_property(_sbom_binary_dir GLOBAL PROPERTY SBOM_BINARY_DIR)
+
 	file(
 		GENERATE
-		OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${SBOM_DIRECTORY_SPDXID}.cmake"
+		OUTPUT "${_sbom_binary_dir}/${SBOM_DIRECTORY_SPDXID}.cmake"
 		CONTENT
 		"
 file(GLOB_RECURSE _files
@@ -763,7 +767,7 @@ endforeach()
 "
 	)
 
-	install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_DIRECTORY_SPDXID}.cmake)
+	install(SCRIPT ${_sbom_binary_dir}/${SBOM_DIRECTORY_SPDXID}.cmake)
 
 	set(SBOM_LAST_SPDXID "" PARENT_SCOPE)
 endfunction()
@@ -849,9 +853,11 @@ ExternalRef: ${_ref}"
 		)
 	endif()
 
+	get_property(_sbom_binary_dir GLOBAL PROPERTY SBOM_BINARY_DIR)
+
 	file(
 		GENERATE
-		OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_PACKAGE_SPDXID}.cmake
+		OUTPUT ${_sbom_binary_dir}/${SBOM_PACKAGE_SPDXID}.cmake
 		CONTENT
 		"
 			file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
@@ -872,10 +878,8 @@ Relationship: ${SBOM_PACKAGE_SPDXID} CONTAINS NOASSERTION
 			"
 	)
 
-	get_property(_sbom_binary_dir GLOBAL PROPERTY SBOM_BINARY_DIR)
-
 	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt
-		"install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_PACKAGE_SPDXID}.cmake)
+		"install(SCRIPT ${_sbom_binary_dir}/${SBOM_PACKAGE_SPDXID}.cmake)
 "
 	)
 
@@ -920,10 +924,12 @@ function(sbom_add_external ID PATH)
 		)
 	endif()
 
+	get_property(_sbom_binary_dir GLOBAL PROPERTY SBOM_BINARY_DIR)
+
 	# Filename may not exist yet, and it could be a generator expression.
 	file(
 		GENERATE
-		OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_EXTERNAL_SPDXID}.cmake
+		OUTPUT ${_sbom_binary_dir}/${SBOM_EXTERNAL_SPDXID}.cmake
 		CONTENT
 		"
 			file(SHA1 \"${PATH}\" ext_sha1)
@@ -951,11 +957,10 @@ Relationship: ${SBOM_EXTERNAL_RELATIONSHIP}\")
 		"
 	)
 
-	get_property(_sbom_binary_dir GLOBAL PROPERTY SBOM_BINARY_DIR)
-
 	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt
-		"install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/${SBOM_EXTERNAL_SPDXID}.cmake)
+		"install(SCRIPT ${_sbom_binary_dir}/${SBOM_EXTERNAL_SPDXID}.cmake)
 "
 	)
+
 
 endfunction()
