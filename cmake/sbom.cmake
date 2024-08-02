@@ -416,28 +416,38 @@ function(sbom_generate)
 
 	file(MAKE_DIRECTORY ${SBOM_BINARY_DIR})
 
-	install(CODE "
-		if(IS_ABSOLUTE ${SBOM_GENERATE_OUTPUT})
-			set(SBOM_FILENAME \"${SBOM_GENERATE_OUTPUT}\")
-		else()
-			set(SBOM_FILENAME \"\${CMAKE_INSTALL_PREFIX}/${SBOM_GENERATE_OUTPUT}\")
-		endif()
-		set(SBOM_BINARY_DIR \"${SBOM_BINARY_DIR}\")
-		set(SBOM_EXT_DOCS)
-		message(STATUS \"Installing: \${SBOM_FILENAME}\")"
-		)
-
-	set(_sbom_intermediate_file "$<CONFIG>/sbom.spdx.in")
-	install(CODE "
-		set(SBOM_INTERMEDIATE_FILE \"\${SBOM_BINARY_DIR}/${_sbom_intermediate_file}\")
-		file(WRITE \${SBOM_INTERMEDIATE_FILE} \"\")"
+	# collect all sbom install instructions in a separate file.
+	# Will be added as the last install instruction in sbom_finalize().
+	# To keep things debuggable, we don't want to mix the sbom instructions with the rest of the install instructions.
+	file(WRITE ${SBOM_BINARY_DIR}/CMakeLists.txt
+"install(CODE \"
+	if(IS_ABSOLUTE \\\"${SBOM_GENERATE_OUTPUT}\\\")
+		set(SBOM_FILENAME \\\"${SBOM_GENERATE_OUTPUT}\\\")
+	else()
+		set(SBOM_FILENAME \\\"\${CMAKE_INSTALL_PREFIX}/${SBOM_GENERATE_OUTPUT}\\\")
+	endif()
+	set(SBOM_BINARY_DIR \\\"${SBOM_BINARY_DIR}\\\")
+	set(SBOM_EXT_DOCS)
+	message(STATUS \\\"Installing: \\\${SBOM_FILENAME}\\\")\"
+)\n"
 	)
 
+	set(_sbom_intermediate_file "$<CONFIG>/sbom.spdx.in")
+
+	file(APPEND ${SBOM_BINARY_DIR}/CMakeLists.txt
+"# this file is used to collect all SPDX entries before final export
+install(CODE \"
+	set(SBOM_INTERMEDIATE_FILE \\\"\\\${SBOM_BINARY_DIR}/${_sbom_intermediate_file}\\\")
+	file(WRITE \\\${SBOM_INTERMEDIATE_FILE} \\\"\\\")\"
+)\n"
+	)
 
 	if(NOT DEFINED SBOM_GENERATE_INPUT)
 		set(_sbom_document_template "$<CONFIG>/SPDXRef-DOCUMENT.spdx.in")
-		install(
-			CODE "set(SBOM_DOCUMENT_TEMPLATE \"${_sbom_document_template}\")")
+
+		file(APPEND ${SBOM_BINARY_DIR}/CMakeLists.txt
+"install(CODE \"set(SBOM_DOCUMENT_TEMPLATE \\\"${_sbom_document_template}\\\")\")\n"
+		)
 
 		file(
 			GENERATE
@@ -486,11 +496,11 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PROJECT}
 "
 		)
 
-		install(
-			CODE "
-				file(READ \"\${SBOM_BINARY_DIR}/\${SBOM_DOCUMENT_TEMPLATE}\" _f_contents)
-				file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"\${_f_contents}\")
-			"
+		file(APPEND ${SBOM_BINARY_DIR}/CMakeLists.txt
+"install(CODE \"
+	file(READ \\\"\\\${SBOM_BINARY_DIR}/\\\${SBOM_DOCUMENT_TEMPLATE}\\\" _f_contents)
+	file(APPEND \\\"\\\${SBOM_INTERMEDIATE_FILE}\\\" \\\"\\\${_f_contents}\\\")\"
+)\n"
 		)
 
 		set(SBOM_LAST_SPDXID "SPDXRef-${SBOM_GENERATE_PROJECT}" PARENT_SCOPE)
@@ -505,20 +515,22 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PROJECT}
 				OUTPUT "${_f_in_gen}"
 				INPUT "${_f_in}"
 			)
-			install(
-				CODE "
-					file(READ \"${_f_in_gen}\" _f_contents)
-					file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"\${_f_contents}\")
-				"
+
+			file(APPEND ${SBOM_BINARY_DIR}/CMakeLists.txt
+"install(CODE \"
+	file(READ \\\"${_f_in_gen}\\\" _f_contents)
+	file(APPEND \\\"\\\${SBOM_INTERMEDIATE_FILE}\\\" \\\"\\\${_f_contents}\\\")
+\")\n"
 			)
 		endforeach()
 
 		set(SBOM_LAST_SPDXID "" PARENT_SCOPE)
 	endif()
 
-	install(CODE "set(SBOM_VERIFICATION_CODES \"\")")
+	file(APPEND ${SBOM_BINARY_DIR}/CMakeLists.txt
+"install(CODE \"set(SBOM_VERIFICATION_CODES \\\"\\\")\")\n"
 
-	file(WRITE ${SBOM_BINARY_DIR}/CMakeLists.txt "")
+	)
 endfunction()
 
 # Finalize the generated SBOM. Call after sbom_generate() and other SBOM populating commands.
@@ -542,11 +554,11 @@ configure_file(\"\${SBOM_INTERMEDIATE_FILE}\" \"\${SBOM_FILENAME}\")
 "
 	)
 
-	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt "install(SCRIPT finalize.cmake)
-"
+	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt
+		"install(SCRIPT \"finalize.cmake\")\n"
 	)
 
-	add_subdirectory(${_sbom_binary_dir} ${_sbom_binary_dir})
+	add_subdirectory(${_sbom_binary_dir} ${_sbom_binary_dir}/generate )
 
 	# Mark finalized.
 	set(SBOM_FILENAME "${_sbom}" PARENT_SCOPE)
@@ -648,7 +660,9 @@ endif()
 	"
 	)
 
-	install(SCRIPT ${_sbom_binary_dir}/${SBOM_FILE_SPDXID}.cmake)
+	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt
+		"install(SCRIPT \"${SBOM_FILE_SPDXID}.cmake\")\n"
+	)
 
 	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
 endfunction()
@@ -766,7 +780,9 @@ endforeach()
 "
 	)
 
-	install(SCRIPT ${_sbom_binary_dir}/${SBOM_DIRECTORY_SPDXID}.cmake)
+	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt
+		"install(SCRIPT \"${SBOM_DIRECTORY_SPDXID}.cmake\")\n"
+	)
 
 	set(SBOM_LAST_SPDXID "" PARENT_SCOPE)
 endfunction()
@@ -878,8 +894,7 @@ Relationship: ${SBOM_PACKAGE_SPDXID} CONTAINS NOASSERTION
 	)
 
 	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt
-		"install(SCRIPT ${_sbom_binary_dir}/${SBOM_PACKAGE_SPDXID}.cmake)
-"
+		"install(SCRIPT \"${SBOM_PACKAGE_SPDXID}.cmake\")\n"
 	)
 
 	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
@@ -953,9 +968,7 @@ file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"Relationship: ${SBOM_EXTERNAL_RELAT
 	)
 
 	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt
-		"install(SCRIPT ${_sbom_binary_dir}/${SBOM_EXTERNAL_SPDXID}.cmake)
-"
+		"install(SCRIPT \"${SBOM_EXTERNAL_SPDXID}.cmake\")\n"
 	)
-
 
 endfunction()
