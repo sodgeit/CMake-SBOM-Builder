@@ -546,7 +546,6 @@ configure_file(\"\${SBOM_INTERMEDIATE_FILE}\" \"\${SBOM_FILENAME}\")
 "
 	)
 
-	# Workaround for pre-CMP0082.
 	add_subdirectory(${_sbom_binary_dir} ${_sbom_binary_dir})
 
 	# Mark finalized.
