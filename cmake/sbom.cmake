@@ -422,13 +422,13 @@ function(sbom_generate)
 	file(WRITE ${SBOM_BINARY_DIR}/CMakeLists.txt
 "install(CODE \"
 	if(IS_ABSOLUTE \\\"${SBOM_GENERATE_OUTPUT}\\\")
-		set(SBOM_FILENAME \\\"${SBOM_GENERATE_OUTPUT}\\\")
+		set(SBOM_EXPORT_FILENAME \\\"${SBOM_GENERATE_OUTPUT}\\\")
 	else()
-		set(SBOM_FILENAME \\\"\\\${CMAKE_INSTALL_PREFIX}/${SBOM_GENERATE_OUTPUT}\\\")
+		set(SBOM_EXPORT_FILENAME \\\"\\\${CMAKE_INSTALL_PREFIX}/${SBOM_GENERATE_OUTPUT}\\\")
 	endif()
 	set(SBOM_BINARY_DIR \\\"${SBOM_BINARY_DIR}\\\")
 	set(SBOM_EXT_DOCS)
-	message(STATUS \\\"Installing: \\\${SBOM_FILENAME}\\\")\"
+	message(STATUS \\\"Installing: \\\${SBOM_EXPORT_FILENAME}\\\")\"
 )\n"
 	)
 
@@ -545,12 +545,12 @@ function(sbom_finalize)
 
 	file(
 		WRITE ${_sbom_binary_dir}/finalize.cmake
-"message(STATUS \"Finalizing: \${SBOM_FILENAME}\")
+"message(STATUS \"Finalizing: \${SBOM_EXPORT_FILENAME}\")
 list(SORT SBOM_VERIFICATION_CODES)
 string(REPLACE \";\" \"\" SBOM_VERIFICATION_CODES \"\${SBOM_VERIFICATION_CODES}\")
 file(WRITE \"\${SBOM_BINARY_DIR}/verification.txt\" \"\${SBOM_VERIFICATION_CODES}\")
 file(SHA1 \"\${SBOM_BINARY_DIR}/verification.txt\" SBOM_VERIFICATION_CODE)
-configure_file(\"\${SBOM_INTERMEDIATE_FILE}\" \"\${SBOM_FILENAME}\")
+configure_file(\"\${SBOM_INTERMEDIATE_FILE}\" \"\${SBOM_EXPORT_FILENAME}\")
 "
 	)
 
@@ -558,7 +558,9 @@ configure_file(\"\${SBOM_INTERMEDIATE_FILE}\" \"\${SBOM_FILENAME}\")
 		"install(SCRIPT \"finalize.cmake\")\n"
 	)
 
-	add_subdirectory(${_sbom_binary_dir} ${_sbom_binary_dir}/generate )
+	# using a build dir will generate a seperate cmake_install.cmake file
+	# which helps with debugging
+	add_subdirectory(${_sbom_binary_dir} ${_sbom_binary_dir}/sbom-build )
 
 	# Mark finalized.
 	set(SBOM_FILENAME "${_sbom}" PARENT_SCOPE)
