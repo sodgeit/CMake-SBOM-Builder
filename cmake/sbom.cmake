@@ -324,7 +324,7 @@ endfunction()
 macro(_sbom_generate_document_template)
 	file(
 			GENERATE
-			OUTPUT "${SBOM_BINARY_DIR}/${_sbom_document_template}"
+			OUTPUT "${SBOM_SNIPPET_DIR}/${_sbom_document_template}"
 			CONTENT
 			"SPDXVersion: SPDX-2.3
 DataLicense: CC0-1.0
@@ -369,6 +369,14 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PROJECT}
 "
 		)
 endmacro()
+
+function(_sbom_append_sbom_snippet SNIPPET_SCRIPT)
+	get_property(_sbom_binary_dir GLOBAL PROPERTY SBOM_BINARY_DIR)
+	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
+	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt
+		"install(SCRIPT \"\${SBOM_SNIPPET_DIR}/${SNIPPET_SCRIPT}\")\n"
+	)
+endfunction()
 
 # Starts SBOM generation. Call sbom_add() and friends afterwards. End with sbom_finalize(). Input
 # files allow having variables and generator expressions.
@@ -451,8 +459,10 @@ function(sbom_generate)
 
 	set(SBOM_FILENAME "${SBOM_GENERATE_OUTPUT}" PARENT_SCOPE)
 	set(SBOM_BINARY_DIR "${PROJECT_BINARY_DIR}/sbom")
+	set(SBOM_SNIPPET_DIR "${SBOM_BINARY_DIR}/sbom-src/$<CONFIG>")
 	set_property(GLOBAL PROPERTY SBOM_FILENAME "${SBOM_GENERATE_OUTPUT}")
 	set_property(GLOBAL PROPERTY SBOM_BINARY_DIR "${SBOM_BINARY_DIR}")
+	set_property(GLOBAL PROPERTY SBOM_SNIPPET_DIR "${SBOM_SNIPPET_DIR}")
 	set_property(GLOBAL PROPERTY sbom_project "${SBOM_GENERATE_PROJECT}")
 	set_property(GLOBAL PROPERTY sbom_spdxids 0)
 
@@ -465,8 +475,13 @@ function(sbom_generate)
 
 	file(MAKE_DIRECTORY ${SBOM_BINARY_DIR})
 
+	# collect all sbom install instructions in a separate file.
+	# To keep things debuggable, we don't want to mix the sbom instructions with the rest of the install instructions.
+	# Will be added as via add_subdirectory() to the main project.
+	file(WRITE ${SBOM_BINARY_DIR}/CMakeLists.txt "set(SBOM_SNIPPET_DIR \"${SBOM_SNIPPET_DIR}\")\n")
+
 	set(_sbom_intermediate_file "$<CONFIG>/sbom.spdx.in")
-	set(_sbom_document_template "$<CONFIG>/SPDXRef-DOCUMENT.spdx.in")
+	set(_sbom_document_template "SPDXRef-DOCUMENT.spdx.in")
 	set(_sbom_export_path "${SBOM_GENERATE_OUTPUT}")
 	set(_sbom_provided_input false)
 
@@ -499,24 +514,26 @@ function(sbom_generate)
 		set(SBOM_LAST_SPDXID "" PARENT_SCOPE)
 	endif()
 
+	_sbom_append_sbom_snippet("setup.cmake")
 	file(GENERATE
-		OUTPUT ${SBOM_BINARY_DIR}/setup.cmake
+		OUTPUT ${SBOM_SNIPPET_DIR}/setup.cmake
 		CONTENT "
 set(SBOM_EXPORT_FILENAME \"${_sbom_export_path}\")
 set(SBOM_BINARY_DIR \"${SBOM_BINARY_DIR}\")
+set(SBOM_SNIPPET_DIR \"${SBOM_SNIPPET_DIR}\")
+set(SBOM_DOCUMENT_TEMPLATE \"${_sbom_document_template}\")
 set(SBOM_EXT_DOCS)
 message(STATUS \"Installing: \${SBOM_EXPORT_FILENAME}\")
 
 # this file is used to collect all SPDX entries before final export
-set(SBOM_INTERMEDIATE_FILE \"\${SBOM_BINARY_DIR}/${_sbom_intermediate_file}\")
+set(SBOM_INTERMEDIATE_FILE \"\${SBOM_BINARY_DIR}/sbom-build/${_sbom_intermediate_file}\")
 file(WRITE \${SBOM_INTERMEDIATE_FILE} \"\")
 
 set(SBOM_PROVIDED_INPUT_FILES \"${_sbom_provided_input_files}\")
 set(SBOM_PROVIDED_INPUT ${_sbom_provided_input})
 
 if(NOT SBOM_PROVIDED_INPUT)
-	set(SBOM_DOCUMENT_TEMPLATE \"${_sbom_document_template}\")
-	file(READ \"\${SBOM_BINARY_DIR}/\${SBOM_DOCUMENT_TEMPLATE}\" _f_contents)
+	file(READ \"\${SBOM_SNIPPET_DIR}/\${SBOM_DOCUMENT_TEMPLATE}\" _f_contents)
 	file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"\${_f_contents}\")
 else()
 	foreach(_f IN LISTS SBOM_PROVIDED_INPUT_FILES)
@@ -528,27 +545,23 @@ endif()
 set(SBOM_VERIFICATION_CODES \"\")
 "
 	)
-
-	# collect all sbom install instructions in a separate file.
-	# Will be added as the last install instruction in sbom_finalize().
-	# To keep things debuggable, we don't want to mix the sbom instructions with the rest of the install instructions.
-	file(WRITE ${SBOM_BINARY_DIR}/CMakeLists.txt
-		"install(SCRIPT \"setup.cmake\")\n"
-	)
 endfunction()
 
 # Finalize the generated SBOM. Call after sbom_generate() and other SBOM populating commands.
 function(sbom_finalize)
 	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
 	get_property(_sbom_binary_dir GLOBAL PROPERTY SBOM_BINARY_DIR)
+	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 	get_property(_sbom_project GLOBAL PROPERTY sbom_project)
 
 	if("${_sbom_project}" STREQUAL "")
 		message(FATAL_ERROR "Call sbom_generate() first")
 	endif()
 
-	file(
-		WRITE ${_sbom_binary_dir}/finalize.cmake
+	_sbom_append_sbom_snippet("finalize.cmake")
+	file(GENERATE
+		OUTPUT ${_sbom_snippet_dir}/finalize.cmake
+		CONTENT
 "message(STATUS \"Finalizing: \${SBOM_EXPORT_FILENAME}\")
 list(SORT SBOM_VERIFICATION_CODES)
 string(REPLACE \";\" \"\" SBOM_VERIFICATION_CODES \"\${SBOM_VERIFICATION_CODES}\")
@@ -556,10 +569,6 @@ file(WRITE \"\${SBOM_BINARY_DIR}/verification.txt\" \"\${SBOM_VERIFICATION_CODES
 file(SHA1 \"\${SBOM_BINARY_DIR}/verification.txt\" SBOM_VERIFICATION_CODE)
 configure_file(\"\${SBOM_INTERMEDIATE_FILE}\" \"\${SBOM_EXPORT_FILENAME}\")
 "
-	)
-
-	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt
-		"install(SCRIPT \"finalize.cmake\")\n"
 	)
 
 	# using a build dir will generate a seperate cmake_install.cmake file
@@ -626,11 +635,12 @@ function(sbom_add_file FILENAME)
 		)
 	endif()
 
-	get_property(_sbom_binary_dir GLOBAL PROPERTY SBOM_BINARY_DIR)
+	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 
+	_sbom_append_sbom_snippet("${SBOM_FILE_SPDXID}.cmake")
 	file(
 		GENERATE
-		OUTPUT ${_sbom_binary_dir}/${SBOM_FILE_SPDXID}.cmake
+		OUTPUT ${_sbom_snippet_dir}/${SBOM_FILE_SPDXID}.cmake
 		CONTENT
 		"
 cmake_policy(SET CMP0011 NEW)
@@ -664,10 +674,6 @@ Relationship: ${SBOM_FILE_RELATIONSHIP}
 	)
 endif()
 	"
-	)
-
-	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt
-		"install(SCRIPT \"${SBOM_FILE_SPDXID}.cmake\")\n"
 	)
 
 	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
@@ -744,11 +750,12 @@ function(sbom_add_directory PATH)
 		)
 	endif()
 
-	get_property(_sbom_binary_dir GLOBAL PROPERTY SBOM_BINARY_DIR)
+	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 
+	_sbom_append_sbom_snippet("${SBOM_DIRECTORY_SPDXID}.cmake")
 	file(
 		GENERATE
-		OUTPUT "${_sbom_binary_dir}/${SBOM_DIRECTORY_SPDXID}.cmake"
+		OUTPUT "${_sbom_snippet_dir}/${SBOM_DIRECTORY_SPDXID}.cmake"
 		CONTENT
 		"
 file(GLOB_RECURSE _files
@@ -784,10 +791,6 @@ Relationship: ${SBOM_DIRECTORY_RELATIONSHIP}-\${_count}
 	math(EXPR _count \"\${_count} + 1\")
 endforeach()
 "
-	)
-
-	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt
-		"install(SCRIPT \"${SBOM_DIRECTORY_SPDXID}.cmake\")\n"
 	)
 
 	set(SBOM_LAST_SPDXID "" PARENT_SCOPE)
@@ -874,11 +877,12 @@ ExternalRef: ${_ref}"
 		)
 	endif()
 
-	get_property(_sbom_binary_dir GLOBAL PROPERTY SBOM_BINARY_DIR)
+	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 
+	_sbom_append_sbom_snippet("${SBOM_PACKAGE_SPDXID}.cmake")
 	file(
 		GENERATE
-		OUTPUT ${_sbom_binary_dir}/${SBOM_PACKAGE_SPDXID}.cmake
+		OUTPUT ${_sbom_snippet_dir}/${SBOM_PACKAGE_SPDXID}.cmake
 		CONTENT
 		"
 			file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
@@ -897,10 +901,6 @@ Relationship: ${SBOM_PACKAGE_SPDXID} CONTAINS NOASSERTION
 \"
 			)
 			"
-	)
-
-	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt
-		"install(SCRIPT \"${SBOM_PACKAGE_SPDXID}.cmake\")\n"
 	)
 
 	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
@@ -944,12 +944,12 @@ function(sbom_add_external ID PATH)
 		)
 	endif()
 
-	get_property(_sbom_binary_dir GLOBAL PROPERTY SBOM_BINARY_DIR)
+	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 
-	# Filename may not exist yet, and it could be a generator expression.
+	_sbom_append_sbom_snippet("${SBOM_EXTERNAL_SPDXID}.cmake")
 	file(
 		GENERATE
-		OUTPUT ${_sbom_binary_dir}/${SBOM_EXTERNAL_SPDXID}.cmake
+		OUTPUT ${_sbom_snippet_dir}/${SBOM_EXTERNAL_SPDXID}.cmake
 		CONTENT
 "file(SHA1 \"${PATH}\" ext_sha1)
 file(READ \"${PATH}\" ext_content)
@@ -972,9 +972,4 @@ list(APPEND SBOM_EXT_DOCS \"ExternalDocumentRef: ${SBOM_EXTERNAL_SPDXID} \${ext_
 file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"Relationship: ${SBOM_EXTERNAL_RELATIONSHIP}\")
 "
 	)
-
-	file(APPEND ${_sbom_binary_dir}/CMakeLists.txt
-		"install(SCRIPT \"${SBOM_EXTERNAL_SPDXID}.cmake\")\n"
-	)
-
 endfunction()
