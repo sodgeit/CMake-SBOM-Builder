@@ -203,6 +203,8 @@ sbom_generate(
   - `--prefix` option is honoured when added to the install command.
   - `--prefix` and `${CMAKE_INSTALL_PREFIX}` have no effect when `OUTPUT` is an absolute path.
 - `INPUT`: One or more file names, which are concatenated into the SBOM output file.
+  - ***Restrictions:***
+    - Absolute paths only.
   - Variables and generator expressions are supported in these files.
   - Variables in the form `@var@` are replaced during config, `${var}` during install.
   - When omitted, a standard document/package SBOM is generated.

@@ -416,39 +416,16 @@ function(sbom_generate)
 
 	file(MAKE_DIRECTORY ${SBOM_BINARY_DIR})
 
-	# collect all sbom install instructions in a separate file.
-	# Will be added as the last install instruction in sbom_finalize().
-	# To keep things debuggable, we don't want to mix the sbom instructions with the rest of the install instructions.
-	file(WRITE ${SBOM_BINARY_DIR}/CMakeLists.txt
-"install(CODE \"
-	if(IS_ABSOLUTE \\\"${SBOM_GENERATE_OUTPUT}\\\")
-		set(SBOM_EXPORT_FILENAME \\\"${SBOM_GENERATE_OUTPUT}\\\")
-	else()
-		set(SBOM_EXPORT_FILENAME \\\"\\\${CMAKE_INSTALL_PREFIX}/${SBOM_GENERATE_OUTPUT}\\\")
-	endif()
-	set(SBOM_BINARY_DIR \\\"${SBOM_BINARY_DIR}\\\")
-	set(SBOM_EXT_DOCS)
-	message(STATUS \\\"Installing: \\\${SBOM_EXPORT_FILENAME}\\\")\"
-)\n"
-	)
-
 	set(_sbom_intermediate_file "$<CONFIG>/sbom.spdx.in")
+	set(_sbom_document_template "$<CONFIG>/SPDXRef-DOCUMENT.spdx.in")
+	set(_sbom_export_path "${SBOM_GENERATE_OUTPUT}")
+	set(_sbom_provided_input false)
 
-	file(APPEND ${SBOM_BINARY_DIR}/CMakeLists.txt
-"# this file is used to collect all SPDX entries before final export
-install(CODE \"
-	set(SBOM_INTERMEDIATE_FILE \\\"\\\${SBOM_BINARY_DIR}/${_sbom_intermediate_file}\\\")
-	file(WRITE \\\${SBOM_INTERMEDIATE_FILE} \\\"\\\")\"
-)\n"
-	)
+	if(NOT IS_ABSOLUTE "${SBOM_GENERATE_OUTPUT}")
+		set(_sbom_export_path "\${CMAKE_INSTALL_PREFIX}/${SBOM_GENERATE_OUTPUT}")
+	endif()
 
 	if(NOT DEFINED SBOM_GENERATE_INPUT)
-		set(_sbom_document_template "$<CONFIG>/SPDXRef-DOCUMENT.spdx.in")
-
-		file(APPEND ${SBOM_BINARY_DIR}/CMakeLists.txt
-"install(CODE \"set(SBOM_DOCUMENT_TEMPLATE \\\"${_sbom_document_template}\\\")\")\n"
-		)
-
 		file(
 			GENERATE
 			OUTPUT "${SBOM_BINARY_DIR}/${_sbom_document_template}"
@@ -496,18 +473,16 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PROJECT}
 "
 		)
 
-		file(APPEND ${SBOM_BINARY_DIR}/CMakeLists.txt
-"install(CODE \"
-	file(READ \\\"\\\${SBOM_BINARY_DIR}/\\\${SBOM_DOCUMENT_TEMPLATE}\\\" _f_contents)
-	file(APPEND \\\"\\\${SBOM_INTERMEDIATE_FILE}\\\" \\\"\\\${_f_contents}\\\")\"
-)\n"
-		)
-
 		set(SBOM_LAST_SPDXID "SPDXRef-${SBOM_GENERATE_PROJECT}" PARENT_SCOPE)
 	else()
+		set(_sbom_provided_input true)
+		set(_sbom_provided_input_files "")
 		foreach(_f IN LISTS SBOM_GENERATE_INPUT)
+			if( NOT IS_ABSOLUTE "${_f}" )
+				message(FATAL_ERROR "Input file must be an absolute path: ${_f}")
+			endif()
 			get_filename_component(_f_name "${_f}" NAME) #REFAC(>=3.20): Use cmake_path() instead of get_filename_component().
-			set(_f_in "${CMAKE_CURRENT_BINARY_DIR}/${_f_name}")
+			set(_f_in "${SBOM_BINARY_DIR}/${_f_name}")
 			set(_f_in_gen "${_f_in}_gen")
 			configure_file("${_f}" "${_f_in}" @ONLY)
 			file(
@@ -515,21 +490,47 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PROJECT}
 				OUTPUT "${_f_in_gen}"
 				INPUT "${_f_in}"
 			)
-
-			file(APPEND ${SBOM_BINARY_DIR}/CMakeLists.txt
-"install(CODE \"
-	file(READ \\\"${_f_in_gen}\\\" _f_contents)
-	file(APPEND \\\"\\\${SBOM_INTERMEDIATE_FILE}\\\" \\\"\\\${_f_contents}\\\")
-\")\n"
-			)
+			list(APPEND _sbom_provided_input_files "${_f_in_gen}")
 		endforeach()
 
 		set(SBOM_LAST_SPDXID "" PARENT_SCOPE)
 	endif()
 
-	file(APPEND ${SBOM_BINARY_DIR}/CMakeLists.txt
-"install(CODE \"set(SBOM_VERIFICATION_CODES \\\"\\\")\")\n"
+	file(GENERATE
+		OUTPUT ${SBOM_BINARY_DIR}/setup.cmake
+		CONTENT "
+set(SBOM_EXPORT_FILENAME \"${_sbom_export_path}\")
+set(SBOM_BINARY_DIR \"${SBOM_BINARY_DIR}\")
+set(SBOM_EXT_DOCS)
+message(STATUS \"Installing: \${SBOM_EXPORT_FILENAME}\")
 
+# this file is used to collect all SPDX entries before final export
+set(SBOM_INTERMEDIATE_FILE \"\${SBOM_BINARY_DIR}/${_sbom_intermediate_file}\")
+file(WRITE \${SBOM_INTERMEDIATE_FILE} \"\")
+
+set(SBOM_PROVIDED_INPUT_FILES \"${_sbom_provided_input_files}\")
+set(SBOM_PROVIDED_INPUT ${_sbom_provided_input})
+
+if(NOT SBOM_PROVIDED_INPUT)
+	set(SBOM_DOCUMENT_TEMPLATE \"${_sbom_document_template}\")
+	file(READ \"\${SBOM_BINARY_DIR}/\${SBOM_DOCUMENT_TEMPLATE}\" _f_contents)
+	file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"\${_f_contents}\")
+else()
+	foreach(_f IN LISTS SBOM_PROVIDED_INPUT_FILES)
+		file(READ \"\${_f}\" _f_contents)
+		file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"\${_f_contents}\")
+	endforeach()
+endif()
+
+set(SBOM_VERIFICATION_CODES \"\")
+"
+	)
+
+	# collect all sbom install instructions in a separate file.
+	# Will be added as the last install instruction in sbom_finalize().
+	# To keep things debuggable, we don't want to mix the sbom instructions with the rest of the install instructions.
+	file(WRITE ${SBOM_BINARY_DIR}/CMakeLists.txt
+		"install(SCRIPT \"setup.cmake\")\n"
 	)
 endfunction()
 
