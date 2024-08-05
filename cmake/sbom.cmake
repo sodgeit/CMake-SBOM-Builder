@@ -321,6 +321,55 @@ function(sbom_spdxid)
 	set(${SBOM_SPDXID_VARIABLE} "${_id}" PARENT_SCOPE)
 endfunction()
 
+macro(_sbom_generate_document_template)
+	file(
+			GENERATE
+			OUTPUT "${SBOM_BINARY_DIR}/${_sbom_document_template}"
+			CONTENT
+			"SPDXVersion: SPDX-2.3
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: ${doc_name}
+DocumentNamespace: ${SBOM_GENERATE_NAMESPACE}
+Creator: Organization: ${SBOM_GENERATE_SUPPLIER}
+Creator: Tool: CMake-SBOM-Builder-${SBOM_BUILDER_VERSION}
+CreatorComment: <text>This SPDX document was created from CMake ${CMAKE_VERSION}, using CMake-SBOM-Builder from https://github.com/sodgeit/CMake-SBOM-Builder</text>
+Created: ${NOW_UTC}\${SBOM_EXT_DOCS}
+
+PackageName: ${CMAKE_CXX_COMPILER_ID}
+SPDXID: SPDXRef-compiler
+PackageVersion: ${CMAKE_CXX_COMPILER_VERSION}
+PackageDownloadLocation: NOASSERTION
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+PackageSupplier: Organization: Anonymous
+FilesAnalyzed: false
+PackageSummary: <text>The compiler as identified by CMake, running on ${CMAKE_HOST_SYSTEM_NAME} (${CMAKE_HOST_SYSTEM_PROCESSOR})</text>
+PrimaryPackagePurpose: APPLICATION
+Relationship: SPDXRef-compiler CONTAINS NOASSERTION
+Relationship: SPDXRef-compiler BUILD_DEPENDENCY_OF SPDXRef-${SBOM_GENERATE_PROJECT}
+RelationshipComment: <text>SPDXRef-${SBOM_GENERATE_PROJECT} is built by compiler ${CMAKE_CXX_COMPILER_ID} (${CMAKE_CXX_COMPILER}) version ${CMAKE_CXX_COMPILER_VERSION}</text>
+
+PackageName: ${PROJECT_NAME}
+SPDXID: SPDXRef-${SBOM_GENERATE_PROJECT}
+ExternalRef: SECURITY cpe23Type ${SBOM_CPE}
+ExternalRef: PACKAGE-MANAGER purl pkg:supplier/${SBOM_GENERATE_SUPPLIER}/${PROJECT_NAME}@${GIT_VERSION}
+PackageVersion: ${GIT_VERSION}
+PackageSupplier: Organization: ${SBOM_GENERATE_SUPPLIER}
+PackageDownloadLocation: NOASSERTION
+PackageLicenseConcluded: ${SBOM_GENERATE_LICENSE}
+PackageLicenseDeclared: ${SBOM_GENERATE_LICENSE}
+PackageCopyrightText: ${SBOM_GENERATE_COPYRIGHT}
+PackageHomePage: ${SBOM_GENERATE_SUPPLIER_URL}
+PackageComment: <text>Built by CMake ${CMAKE_VERSION} with $<CONFIG> configuration for ${CMAKE_SYSTEM_NAME} (${CMAKE_SYSTEM_PROCESSOR})</text>
+PackageVerificationCode: \${SBOM_VERIFICATION_CODE}
+BuiltDate: ${NOW_UTC}
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PROJECT}
+"
+		)
+endmacro()
+
 # Starts SBOM generation. Call sbom_add() and friends afterwards. End with sbom_finalize(). Input
 # files allow having variables and generator expressions.
 function(sbom_generate)
@@ -426,53 +475,7 @@ function(sbom_generate)
 	endif()
 
 	if(NOT DEFINED SBOM_GENERATE_INPUT)
-		file(
-			GENERATE
-			OUTPUT "${SBOM_BINARY_DIR}/${_sbom_document_template}"
-			CONTENT
-			"SPDXVersion: SPDX-2.3
-DataLicense: CC0-1.0
-SPDXID: SPDXRef-DOCUMENT
-DocumentName: ${doc_name}
-DocumentNamespace: ${SBOM_GENERATE_NAMESPACE}
-Creator: Organization: ${SBOM_GENERATE_SUPPLIER}
-Creator: Tool: CMake-SBOM-Builder-${SBOM_BUILDER_VERSION}
-CreatorComment: <text>This SPDX document was created from CMake ${CMAKE_VERSION}, using CMake-SBOM-Builder from https://github.com/sodgeit/CMake-SBOM-Builder</text>
-Created: ${NOW_UTC}\${SBOM_EXT_DOCS}
-
-PackageName: ${CMAKE_CXX_COMPILER_ID}
-SPDXID: SPDXRef-compiler
-PackageVersion: ${CMAKE_CXX_COMPILER_VERSION}
-PackageDownloadLocation: NOASSERTION
-PackageLicenseConcluded: NOASSERTION
-PackageLicenseDeclared: NOASSERTION
-PackageCopyrightText: NOASSERTION
-PackageSupplier: Organization: Anonymous
-FilesAnalyzed: false
-PackageSummary: <text>The compiler as identified by CMake, running on ${CMAKE_HOST_SYSTEM_NAME} (${CMAKE_HOST_SYSTEM_PROCESSOR})</text>
-PrimaryPackagePurpose: APPLICATION
-Relationship: SPDXRef-compiler CONTAINS NOASSERTION
-Relationship: SPDXRef-compiler BUILD_DEPENDENCY_OF SPDXRef-${SBOM_GENERATE_PROJECT}
-RelationshipComment: <text>SPDXRef-${SBOM_GENERATE_PROJECT} is built by compiler ${CMAKE_CXX_COMPILER_ID} (${CMAKE_CXX_COMPILER}) version ${CMAKE_CXX_COMPILER_VERSION}</text>
-
-PackageName: ${PROJECT_NAME}
-SPDXID: SPDXRef-${SBOM_GENERATE_PROJECT}
-ExternalRef: SECURITY cpe23Type ${SBOM_CPE}
-ExternalRef: PACKAGE-MANAGER purl pkg:supplier/${SBOM_GENERATE_SUPPLIER}/${PROJECT_NAME}@${GIT_VERSION}
-PackageVersion: ${GIT_VERSION}
-PackageSupplier: Organization: ${SBOM_GENERATE_SUPPLIER}
-PackageDownloadLocation: NOASSERTION
-PackageLicenseConcluded: ${SBOM_GENERATE_LICENSE}
-PackageLicenseDeclared: ${SBOM_GENERATE_LICENSE}
-PackageCopyrightText: ${SBOM_GENERATE_COPYRIGHT}
-PackageHomePage: ${SBOM_GENERATE_SUPPLIER_URL}
-PackageComment: <text>Built by CMake ${CMAKE_VERSION} with $<CONFIG> configuration for ${CMAKE_SYSTEM_NAME} (${CMAKE_SYSTEM_PROCESSOR})</text>
-PackageVerificationCode: \${SBOM_VERIFICATION_CODE}
-BuiltDate: ${NOW_UTC}
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PROJECT}
-"
-		)
-
+		_sbom_generate_document_template()
 		set(SBOM_LAST_SPDXID "SPDXRef-${SBOM_GENERATE_PROJECT}" PARENT_SCOPE)
 	else()
 		set(_sbom_provided_input true)
