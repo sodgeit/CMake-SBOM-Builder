@@ -1,6 +1,8 @@
 # CMake SBOM Builder
 
-This project provides a CMake module that helps generate (*Produce (Build)*) a Software Bill of Materials (SBOM) in `SPDX`-format for an arbitrary CMake project.
+This project provides a CMake module that helps your to generate Software Bill of Materials (SBOM) in `SPDX`-format for an arbitrary CMake project.
+
+This Project only supports SPDX version 2.3. The SPDX specification is available [here](https://spdx.github.io/spdx-spec/v2.3/).
 
 It automates two tasks:
 
@@ -10,8 +12,6 @@ It automates two tasks:
 The version extraction helps to get the version in the application and SBOM right. The SBOM contains the files you mention explicitly, just like you mention what to `install()` in CMake.
 
 To integrate this library in your project, see [below](#how-to-use) for basic instructions or the example for a simple example project.
-
-[SPDX](https://spdx.github.io/spdx-spec/v2.3/)
 
 ---
 
@@ -24,9 +24,9 @@ Major Changes include:
 
 - **Single-File Integration**: We condensed everything into a single file to facilitate integration with CMake's `file` command, making it simpler and more efficient to use.
 - **Multi Config Generator Enhancements**: The SBOM generation better integrates with multi-config generators like Visual Studio and Ninja Multi-Config. Different SBOM's are generated for each configuration.
-- **CMake-Based Verification**: Some verification processes have been moved into CMake itself. (Though it does not replace external verification tools)
 - **Removed External Python Tools**: The verification process that relied on external Python tools has been removed to minimize dependencies and simplify the setup.
-- **Modernized CMake**: A higher minimum required version (>=3.14), ensuring better compatibility and taking advantage of newer functionalities.
+- **Modernized CMake**: A higher minimum required version (>=3.16), ensuring better compatibility and taking advantage of newer functionalities.
+- **Wider support for SPDX fields**: While the original project focused on the most important SPDX fields, to keep SBOM generation simple, we added support for more SPDX fields to provide more flexibility and customization, while maintaining the initial vision of auto-generating most fields.
 
 ---
 
@@ -34,7 +34,6 @@ Major Changes include:
 
 - [How to use](#how-to-use)
 - [SBOM generation](#sbom-generation)
-	- [`sbom_spdxid`](#sbom_spdxid)
 	- [`sbom_generate`](#sbom_generate)
 	- [`sbom_add_file`](#sbom_add_file)
 		- [`sbom_add_directory`](#sbom_add_directory)
@@ -42,6 +41,7 @@ Major Changes include:
 	- [`sbom_add_package`](#sbom_add_package)
 	- [`sbom_add_external`](#sbom_add_external)
 	- [`sbom_finalize`](#sbom_finalize)
+	- [`sbom_spdxid`](#sbom_spdxid)
 - [Version Extraction](#version-extraction)
 	- [`version_extract()`](#version_extract)
 	- [`version_generate()`](#version_generate)
@@ -53,7 +53,7 @@ Major Changes include:
 
 ## How to use
 
-To use this library, perform the following steps:
+To use this CMake module, perform the following steps:
 
 1. Put `sbom.cmake` somewhere in your project.
 
@@ -93,7 +93,11 @@ To use this library, perform the following steps:
 3. Somewhere ***after*** `project(...)`, prepare the SBOM:
 
 	```cmake
-	sbom_generate(SUPPLIER you SUPPLIER_URL https://www.some.where)
+	sbom_generate(
+		SUPPLIER ORGANIZATION "sodgeIT" EMAIL "kontakt@sodgeit.de"
+		PACKAGE_URL "https://github.com/sodgeit/CMake-SBOM-Builder"
+		PACKAGE_LICENSE "MIT"
+	)
 
 	# Add sbom_add_*() ...
 	sbom_add_package(<library>)
@@ -141,15 +145,19 @@ To use this library, perform the following steps:
 
 ## SBOM generation
 
-The concept is that an SBOM is generated for one project. It contains one package (the output of the project), which contains files, and other package dependencies. The files are all installed under `CMAKE_INSTALL_PREFIX`. The package dependencies are all black boxes; their files are not specified.
+The concept is that an SBOM is generated for one project, and describes the output of that project as a single package, which contains files, and other package dependencies. The files are all installed under `CMAKE_INSTALL_PREFIX`. The package dependencies are all black boxes; their files are not specified.
 
 Generally, the following sequence is executed to create the SBOM:
 
 ```cmake
 # Start SBOM generation. Optionally, provide template files, licence, copyright.
-sbom_generate(OUTPUT some_output_file.spdx)
+sbom_generate(
+	SUPPLIER ORGANIZATION "sodgeIT" EMAIL "kontakt@sodgeit.de"
+	PACKAGE_URL "https://github.com/sodgeit/CMake-SBOM-Builder"
+	PACKAGE_LICENSE "MIT"
+)
 
-# Call for every artifact that should be recorded:
+# Call for every artifact that should be recorded/that is part of the distributed package.
 sbom_add_target(some_target)
 sbom_add_file(some_filename ...)
 sbom_add_directory(all_files_from_some_directory ...)
@@ -163,40 +171,56 @@ sbom_finalize()
 
 `cmake/sbom.cmake` provides the following functions:
 
-### `sbom_spdxid`
-
-Generate a unique SPDX identifier.
-
-```cmake
-sbom_spdxid(
-   VARIABLE <variable_name>
-   [CHECK <id> | HINTS <hint>...]
-)
-```
-
-- `VARIABLE`: The output variable to generate a unique SDPX identifier in.
-- `CHECK`: Verify and return the given identifier.
-- `HINTS`: One or more hints, which are converted into a valid identifier. The first non-empty hint is used. If no hint is specified, a unique identifier is returned, with unspecified format.
-
-This should rarely be used directly. All sbom_add_* functions will use this function to automatically generate unique SPDX identifiers.
-
 ### `sbom_generate`
 
-Generate the header of the SBOM, based on a standard template where the given details are filled in.
+Generates the SBOM creator information, as well as the information of the package that the SBOM describes. (see spdx clause 6 & 7)
 
 ```cmake
 sbom_generate(
+   [SUPPLIER <NOASSERTION|PERSON|ORGANIZATION> <name> [EMAIL <email>]]
+   [PACKAGE_NAME <package_name>]
+   [PACKAGE_VERSION <version_string>]
+   [PACKAGE_FILENAME <filename>]
+   [PACKAGE_DOWNLOAD <NOASSERTION|NONE|<url>>]
+   [PACKAGE_URL <NOASSERTION|NONE|<url>>]
+   [PACKAGE_LICENSE <NOASSERTION|NONE|<SPDX License Expression>>]
+   [PACKAGE_COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
+   [PACKAGE_SUMMARY <package_summary_text>]
+   [PACKAGE_DESCRIPTION <package_description_text>]
    [OUTPUT <filename>]
    [INPUT <filename>...]
-   [COPYRIGHT <string>]
-   [LICENSE <string>]
    [NAMESPACE <URI>]
-   [PROJECT <name>]
-   [SUPPLIER <name>]
-   [SUPPLIER_URL <name>]
 )
 ```
 
+- `SUPPLIER`: Supplier of the Package and Creator of the sbom (spdx clause 6.8 & clause 7.5)
+  - May be omitted when any `INPUT` is given.
+  - Adds both the `Creator` and `PackageSupplier` fields to the SBOM.
+  - One of the `<NOASSERTION|PERSON|ORGANIZATION>` keywords must be provided.
+    - For `NOASSERTION`: `<name>` and `EMAIL` are not used.
+  - `<name>` is either a person or organization name.
+  - `EMAIL` is optional.
+  - Usage:
+    - `sbom_generate(... SUPPLIER ORGANIZATION "My Company" EMAIL "contact@company.com" ...)`
+    - `sbom_generate(... SUPPLIER PERSON "Firstname Lastname" ...)`
+    - `sbom_generate(... SUPPLIER NOASSERTION ...)`
+- `PACKAGE_NAME`: Package name. Defaults to `PROJECT_NAME`.
+- `PACKAGE_VERSION`: Package version field (spdx clause 7.3)
+  - Defaults to `${GIT_VERSION}`. (see [Version Extraction](#version-extraction))
+- `PACKAGE_FILENAME`: Filename of the distributed package. (spdx clause 7.4)
+  - Defaults to `${PACKAGE_NAME}-${PACKAGE_VERSION}.zip`.
+- `PACKAGE_DOWNLOAD`: Download location of the distributed package. (spdx clause 7.7)
+  - Either `NOASSERTION`, `NONE`, or a `<url>`.
+  - If omitted, defaults to `NOASSERTION`.
+- `PACKAGE_URL`: Package home page.
+  - may be omitted when any `INPUT` is given.
+  - `NONE` or `NOASSERTION` require that `NAMESPACE` is provided.
+  - otherwise `<url>` is required.
+- `PACKAGE_LICENSE`: License of the package described in the SBOM. (spdx clause 7.15 & 7.13)
+  - Requires one of `NOASSERTION`, `NONE`, or a valid SPDX license expression.
+  - If omitted, defaults to `NOASSERTION`.
+  - Adds both the `PackageLicenseDeclared` and `PackageLicenseConcluded` fields to the SBOM.
+    - Differentiating between declared and concluded licenses, does not make sense when the creator of the SBOM also supplies the package.
 - `OUTPUT`: Output filename.
   - Can be absolute or relative to `CMAKE_INSTALL_PREFIX`.
   - Default location is `${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}-sbom-${GIT_VERSION_PATH}.spdx`.
@@ -209,12 +233,43 @@ sbom_generate(
   - Variables in the form `@var@` are replaced during config, `${var}` during install.
   - When omitted, a standard document/package SBOM is generated.
   - The other parameters can be referenced in the input files, prefixed with `SBOM_GENERATE_`.
-- `COPYRIGHT`: Copyright information. If not specified, it is generated as `<year> <supplier>`.
-- `LICENSE`: License information. If not specified, `NOASSERTION` is used.
-- `NAMESPACE`: Document namespace. If not specified, default to a URL based on `SUPPLIER_URL`, `PROJECT_NAME` and `GIT_VERSION`.
-- `PROJECT`: Project name. Defaults to `PROJECT_NAME`.
-- `SUPPLIER`: Supplier name. It may be omitted when the variable `SBOM_SUPPLIER` is set or when any `INPUT` is given.
-- `SUPPLIER_URL`: Supplier home page. It may be omitted when the variable `SBOM_SUPPLIER_URL` is set or when any `INPUT` is given.
+- `PACKAGE_COPYRIGHT`: Copyright information. (spdx clause 7.17)
+  - Either `NOASSERTION`, `NONE`, or a `<copyright_text>`.
+  - If omitted, generates as `<year> <name>` where `<name>` is the `SUPPLIER` name.
+    - If `NOASSERTION` was set for `SUPPLIER`, the `PACKAGE_COPYRIGHT` defaults to `NOASSERTION`.
+- `PACKAGE_SUMMARY`: Package summary. (spdx clause 7.18)
+  - Optional.
+  - Free form text summarizing the package.
+- `PACKAGE_DESCRIPTION`: (spdx clause 7.19)
+  - Optional.
+  - Free form text summarizing the package.
+  - Similar to `PACKAGE_SUMMARY`, but more detailed.
+- `NAMESPACE`: Document namespace.
+  - may be omitted when any `INPUT` is given.
+  - If not specified, default to a URL based on `PACKAGE_URL`, `PROJECT_NAME` and `GIT_VERSION`.
+
+***Unsupported spdx fields:***
+
+The unsupported fields are unlikely to needed in the scope and use case of this project.
+Some fields are autogenerated. Others are defined by the SPDX specification as optional, and can be omitted.
+If you need any of these fields for your use case/workflow, consider opening an issue or a pull request. We are happy to help you out or accept contributions.
+
+- `Creator` (spdx clause 6.8)
+  - This field is required by the SPDX specification, and autogenerated by this project based on the `SUPPLIER` argument.
+  - Used to specify the creator of the SBOM.
+  - The SPDX specification differentiates between Creator of the SBOM and Supplier of the Package it describes, while this project threats them as the same entity.
+  - We base this on the assumption that whoever uses this project, uses it to generate a SBOM for a package they are building. In this case, the creator of the SBOM and the supplier of the package are the same entity.
+- `PackageOriginator` (spdx clause 7.6)
+  - This field is optional in the SPDX specification, and can be omitted.
+  - Used to specify the original creator of the package.
+  - In the use case of this project, the PackageOriginator is unlikely to be a different entity than the Supplier of the Package.
+  - We base this on the assumption that whoever uses this project, uses it to generate a SBOM for a package they are building. In this case, the supplier mentioned in the `SUPPLIER` is also the initial distributor of the package.
+- `PackageChecksum` (spdx clause 7.10)
+  - This field is optional in the SPDX specification, and can be omitted.
+  - Used to specify checksums of the package.
+  - Not yet implemented.
+- `PackageLicenseComments` (spdx clause 7.16)
+  - Not yet implemented.
 
 ### `sbom_add_file`
 
@@ -307,6 +362,23 @@ Finalize the SBOM.
 sbom_finalize()
 ```
 
+### `sbom_spdxid`
+
+***This should rarely be used directly.*** All sbom_add_* functions will use this function to automatically generate unique SPDX identifiers.
+
+Generate a unique SPDX identifier.
+
+```cmake
+sbom_spdxid(
+   VARIABLE <variable_name>
+   [CHECK <id> | HINTS <hint>...]
+)
+```
+
+- `VARIABLE`: The output variable to generate a unique SDPX identifier in.
+- `CHECK`: Verify and return the given identifier.
+- `HINTS`: One or more hints, which are converted into a valid identifier. The first non-empty hint is used. If no hint is specified, a unique identifier is returned, with unspecified format.
+
 ---
 
 ## Version Extraction
@@ -321,7 +393,7 @@ This function sets the following variables in the current scope for the current 
 - `GIT_HASH_SHORT`: The short Git hash.
 - `GIT_VERSION`:
   - If the current commit is tagged, the tag name: `v1.2.3`
-  - If not tagged, `git-describe+branch`: `v1.2.3-4-g1234567+feature/xyz`
+  - If not tagged, `git-describe` + `branch`: `v1.2.3-4-g1234567+feature/xyz`
   - If dirty, a `+dirty` suffix is added in both cases: `v1.2.3-4-g1234567+feature/xyz+dirty` or `v1.2.3+dirty`
     - We want to be very particular about what is considered dirty, so even untracked files are considered dirty.
 - `GIT_VERSION_PATH`:

@@ -34,9 +34,11 @@ include(../cmake/sbom.cmake)
 # This is the only required call to generate the SBOM. It has to be called before any other
 # sbom_add_* function.
 sbom_generate(
-	LICENSE CC0-1.0
-	SUPPLIER ${PROJECT_NAME}
-	SUPPLIER_URL ${PROJECT_HOMEPAGE_URL}
+	SUPPLIER ORGANIZATION "Example Org" EMAIL "example@org.com"
+	PACKAGE_URL ${PROJECT_HOMEPAGE_URL}
+	PACKAGE_DOWNLOAD "http://example.org/download"
+	PACKAGE_LICENSE "MIT"
+	PACKAGE_SUMMARY "Just a simple example project, to demonstrate the SBOM-Builder"
 )
 
 # mention the dependencies used in the SBOM
