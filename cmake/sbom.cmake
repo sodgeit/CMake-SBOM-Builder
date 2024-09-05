@@ -553,10 +553,12 @@ function(sbom_generate)
 		set(SBOM_CHECKS_ENABLED OFF CACHE BOOL "Warn on important missing fields.")
 	endif()
 
+	# remove special characters from package name and replace with -
 	string(REGEX REPLACE "[^A-Za-z0-9.]+" "-" SBOM_GENERATE_PACKAGE_NAME "${SBOM_GENERATE_PACKAGE_NAME}")
+	# strip - from end of string
 	string(REGEX REPLACE "-+$" "" SBOM_GENERATE_PACKAGE_NAME "${SBOM_GENERATE_PACKAGE_NAME}")
 
-	# Prevent collision with other generated SPDXID with -[0-9]+ suffix.
+	# Prevent collision with other generated SPDXID with -[0-9]+ suffix, by removing -.
 	string(REGEX REPLACE "-([0-9]+)$" "\\1" SBOM_GENERATE_PACKAGE_NAME "${SBOM_GENERATE_PACKAGE_NAME}")
 
 	set(SBOM_FILENAME "${SBOM_GENERATE_OUTPUT}" PARENT_SCOPE)
@@ -579,7 +581,7 @@ function(sbom_generate)
 
 	# collect all sbom install instructions in a separate file.
 	# To keep things debuggable, we don't want to mix the sbom instructions with the rest of the install instructions.
-	# Will be added as via add_subdirectory() to the main project.
+	# Will be added via add_subdirectory() to the main project.
 	file(WRITE ${SBOM_BINARY_DIR}/CMakeLists.txt "set(SBOM_SNIPPET_DIR \"${SBOM_SNIPPET_DIR}\")\n")
 
 	set(_sbom_intermediate_file "$<CONFIG>/sbom.spdx.in")
