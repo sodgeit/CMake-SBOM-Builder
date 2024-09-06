@@ -35,6 +35,7 @@ PackageLicenseConcluded: MIT
 PackageLicenseDeclared: MIT
 PackageCopyrightText: 2024 Example Org
 PackageHomePage: https://github.com/sodgeit/CMake-SBOM-Builder
+PackageSummary: <text>Just a simple example project, to demonstrate the SBOM-Builder</text>
 PackageComment: <text>Built by CMake 3.30.1 with Release configuration for Windows (AMD64)</text>
 PackageVerificationCode: eab840722ebab9379e046b88ce0e6f6f616a2eb6
 BuiltDate: 2024-08-29T09:16:55Z

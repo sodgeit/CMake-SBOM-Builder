@@ -352,22 +352,31 @@ macro(_sbom_generate_document_template)
 	endif()
 
 	set(_pkg_summary_field FALSE)
+	set(_pkg_desc_field FALSE)
 	if(DEFINED SBOM_GENERATE_PACKAGE_SUMMARY)
 		set(_pkg_summary_field TRUE)
-		set(_pkg_summary_field_txt "PackageSummary: <text>${SBOM_GENERATE_PACKAGE_SUMMARY}</text>")
+		set(_pkg_summary_field_txt "PackageSummary: <text$<ANGLE-R>${SBOM_GENERATE_PACKAGE_SUMMARY}</text$<ANGLE-R>")
 	endif()
 
-	set(_pkg_desc_field FALSE)
-	if(DEFINED SBOM_GENERATE_PACKAGE_DESCRIPTION)
+	if(DEFINED SBOM_GENERATE_PACKAGE_DESC)
 		set(_pkg_desc_field TRUE)
-		set(_pkg_desc_field_txt "PackageSummary: <text>${SBOM_GENERATE_PACKAGE_DESCRIPTION}</text>")
+		set(_pkg_desc_field_txt "PackageDescription: <text$<ANGLE-R>${SBOM_GENERATE_PACKAGE_DESC}</text$<ANGLE-R>")
+	endif()
+
+	set(_pkg_purpose_fields FALSE)
+	if(DEFINED SBOM_GENERATE_PACKAGE_PURPOSE)
+		set(_pkg_purpose_fields TRUE)
+		set(_pkg_purpose_field_txt "")
+		foreach(_purpose IN LISTS SBOM_GENERATE_PACKAGE_PURPOSE)
+			set(_pkg_purpose_field_txt "${_pkg_purpose_field_txt}\nPrimaryPackagePurpose: ${_purpose}")
+		endforeach()
 	endif()
 
 	file(
-			GENERATE
-			OUTPUT "${SBOM_SNIPPET_DIR}/${_sbom_document_template}"
-			CONTENT
-			"SPDXVersion: SPDX-2.3
+		GENERATE
+		OUTPUT "${SBOM_SNIPPET_DIR}/${_sbom_document_template}"
+		CONTENT
+		"SPDXVersion: SPDX-2.3
 DataLicense: CC0-1.0
 SPDXID: SPDXRef-DOCUMENT
 DocumentName: ${doc_name}
@@ -395,7 +404,7 @@ RelationshipComment: <text>SPDXRef-${SBOM_GENERATE_PACKAGE_NAME} is built by com
 PackageName: ${SBOM_GENERATE_PACKAGE_NAME}
 SPDXID: SPDXRef-${SBOM_GENERATE_PACKAGE_NAME}
 ExternalRef: SECURITY cpe23Type ${SBOM_CPE}
-ExternalRef: PACKAGE-MANAGER purl pkg:supplier/${_pkg_creator_name}/${PROJECT_NAME}@${SBOM_GENERATE_PACKAGE_VERSION}
+ExternalRef: PACKAGE-MANAGER purl pkg:supplier/${_pkg_creator_name}/${SBOM_GENERATE_PACKAGE_NAME}@${SBOM_GENERATE_PACKAGE_VERSION}
 PackageVersion: ${SBOM_GENERATE_PACKAGE_VERSION}
 PackageFileName: ${SBOM_GENERATE_PACKAGE_FILENAME}\
 $<$<BOOL:${_pkg_supplier_field}>:\n${_pkg_supplier_field}>
@@ -403,15 +412,17 @@ PackageDownloadLocation: ${SBOM_GENERATE_PACKAGE_DOWNLOAD}
 PackageLicenseConcluded: ${SBOM_GENERATE_PACKAGE_LICENSE}
 PackageLicenseDeclared: ${SBOM_GENERATE_PACKAGE_LICENSE}\
 $<$<BOOL:${_pkg_copyright_field}>:\n${_pkg_copyright_field}>
-PackageHomePage: ${SBOM_GENERATE_PACKAGE_URL}
-PackageComment: <text>Built by CMake ${CMAKE_VERSION} with $<CONFIG> configuration for ${CMAKE_SYSTEM_NAME} (${CMAKE_SYSTEM_PROCESSOR})</text>\
-$<$<BOOL:${_pkg_summary_field}>:\n${_pkg_summary_field_txt}>
+PackageHomePage: ${SBOM_GENERATE_PACKAGE_URL}\
+$<$<BOOL:${_pkg_summary_field}>:\n${_pkg_summary_field_txt}>\
 $<$<BOOL:${_pkg_desc_field}>:\n${_pkg_desc_field_txt}>
+PackageComment: <text>Built by CMake ${CMAKE_VERSION} with $<CONFIG> configuration for ${CMAKE_SYSTEM_NAME} (${CMAKE_SYSTEM_PROCESSOR})</text>\
+$<$<BOOL:${_pkg_purpose_fields}>:${_pkg_purpose_field_txt}>
 PackageVerificationCode: \${SBOM_VERIFICATION_CODE}
 BuiltDate: \${SBOM_CREATE_DATE}
+ReleaseDate: \${SBOM_CREATE_DATE}
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PACKAGE_NAME}
 "
-		)
+	)
 endmacro()
 
 function(_sbom_append_sbom_snippet SNIPPET_SCRIPT)
@@ -422,41 +433,62 @@ function(_sbom_append_sbom_snippet SNIPPET_SCRIPT)
 	)
 endfunction()
 
-function(_sbom_parse_package_url_field pkg_url_arg out_pkg_url_field)
-	cmake_parse_arguments(_arg_pkg_url_field "NONE;NOASSERTION" "" "" ${pkg_url_arg})
-	if(_arg_pkg_url_field_NONE)
-		set(${out_pkg_url_field} "NONE" PARENT_SCOPE)
-	elseif(_arg_pkg_url_field_NOASSERTION)
-		set(${out_pkg_url_field} "NOASSERTION" PARENT_SCOPE)
-	else()
-		# this only occurs when it's just a url
-		set(${out_pkg_url_field} "${pkg_url_arg}" PARENT_SCOPE)
+function(_sbom_parse_package_notes pkg_notes_arg out_pkg_summary out_pkg_desc out_pkg_comment)
+	cmake_parse_arguments(_arg "" "SUMMARY;DESC;COMMENT" "" ${pkg_notes_arg})
+	if(_arg_SUMMARY)
+		set(${out_pkg_summary} "${_arg_SUMMARY}" PARENT_SCOPE)
 	endif()
+	if(_arg_DESC)
+		set(${out_pkg_desc} "${_arg_DESC}" PARENT_SCOPE)
+	endif()
+	if(_arg_COMMENT)
+		set(${out_pkg_comment} "${_arg_COMMENT}" PARENT_SCOPE)
+	endif()
+endfunction()
+
+function(_sbom_parse_package_purpose pkg_purpose_arg out_purpose_list)
+	set(options "APPLICATION;FRAMEWORK;LIBRARY;CONTAINER;OPERATING-SYSTEM;DEVICE;FIRMWARE;SOURCE;ARCHIVE;FILE;INSTALL;OTHER")
+	cmake_parse_arguments(_arg "${options}" "" "" ${pkg_purpose_arg})
+	if(_arg_UNPARSED_ARGUMENTS)
+		message(FATAL_ERROR "Unknown arguments: ${_arg_UNPARSED_ARGUMENTS}")
+	endif()
+
+	set(${out_purpose_list} "")
+	foreach(opt ${options})
+		if(_arg_${opt})
+			list(APPEND ${out_purpose_list} ${opt})
+		endif()
+	endforeach()
+
+	set(${out_purpose_list} "${${out_purpose_list}}" PARENT_SCOPE)
 endfunction()
 
 # Starts SBOM generation. Call sbom_add() and friends afterwards. End with sbom_finalize(). Input
 # files allow having variables and generator expressions.
 function(sbom_generate)
 	set(oneValueArgs
+		OUTPUT
+		NAMESPACE
 		PACKAGE_NAME
 		PACKAGE_VERSION
 		PACKAGE_FILENAME
+		PACKAGE_DOWNLOAD
 		PACKAGE_URL
 		PACKAGE_LICENSE
 		PACKAGE_COPYRIGHT
-		PACKAGE_SUMMARY
-		PACKAGE_DESCRIPTION
-		OUTPUT
-		NAMESPACE
 		ENABLE_CHECKS
 	)
-	set(multiValueArgs INPUT SUPPLIER PACKAGE_DOWNLOAD)
+	set(multiValueArgs INPUT SUPPLIER PACKAGE_NOTES PACKAGE_PURPOSE)
 	cmake_parse_arguments(
 		SBOM_GENERATE "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
 	)
 
 	if(SBOM_GENERATE_UNPARSED_ARGUMENTS)
 		message(FATAL_ERROR "Unknown arguments: ${SBOM_GENERATE_UNPARSED_ARGUMENTS}")
+	endif()
+
+	if(NOT DEFINED SBOM_GENERATE_PACKAGE_NAME)
+		set(SBOM_GENERATE_PACKAGE_NAME ${PROJECT_NAME})
 	endif()
 
 	if(NOT DEFINED SBOM_GENERATE_INPUT)
@@ -486,7 +518,7 @@ function(sbom_generate)
 			if((NOT DEFINED SBOM_GENERATE_PACKAGE_URL) OR (SBOM_GENERATE_PACKAGE_URL STREQUAL "NONE") OR (SBOM_GENERATE_PACKAGE_URL STREQUAL "NOASSERTION"))
 				message(FATAL_ERROR "Specifiy PACKAGE_URL <url> when NAMESPACE is omitted.")
 			endif()
-			set(SBOM_GENERATE_NAMESPACE "${SBOM_GENERATE_PACKAGE_URL}/spdxdocs/${PROJECT_NAME}-${SBOM_GENERATE_PACKAGE_VERSION}")
+			set(SBOM_GENERATE_NAMESPACE "${SBOM_GENERATE_PACKAGE_URL}/spdxdocs/${SBOM_GENERATE_PACKAGE_NAME}-${SBOM_GENERATE_PACKAGE_VERSION}")
 		endif()
 	endif()
 
@@ -497,11 +529,7 @@ function(sbom_generate)
 	string(TIMESTAMP NOW_UTC UTC)
 
 	if(NOT DEFINED SBOM_GENERATE_OUTPUT)
-		set(SBOM_GENERATE_OUTPUT "./${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}-sbom-${GIT_VERSION_PATH}.spdx")
-	endif()
-
-	if(NOT DEFINED SBOM_GENERATE_PACKAGE_NAME)
-		set(SBOM_GENERATE_PACKAGE_NAME ${PROJECT_NAME})
+		set(SBOM_GENERATE_OUTPUT "./${CMAKE_INSTALL_DATAROOTDIR}/${SBOM_GENERATE_PACKAGE_NAME}-sbom-${GIT_VERSION_PATH}.spdx")
 	endif()
 
 	if(NOT DEFINED SBOM_GENERATE_PACKAGE_VERSION)
@@ -545,6 +573,17 @@ function(sbom_generate)
 		elseif(SBOM_GENERATE_PACKAGE_COPYRIGHT_NOASSERTION)
 			set(SBOM_GENERATE_PACKAGE_COPYRIGHT "NOASSERTION")
 		endif()
+	endif()
+
+	if(DEFINED SBOM_GENERATE_PACKAGE_NOTES)
+		_sbom_parse_package_notes("${SBOM_GENERATE_PACKAGE_NOTES}" SBOM_GENERATE_PACKAGE_SUMMARY
+																   SBOM_GENERATE_PACKAGE_DESC
+																   __unused__)
+		unset(__unused__)
+	endif()
+
+	if(DEFINED SBOM_GENERATE_PACKAGE_PURPOSE)
+		_sbom_parse_package_purpose("${SBOM_GENERATE_PACKAGE_PURPOSE}" SBOM_GENERATE_PACKAGE_PURPOSE)
 	endif()
 
 	if(${SBOM_GENERATE_ENABLE_CHECKS})
