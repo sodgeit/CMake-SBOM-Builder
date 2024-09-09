@@ -304,16 +304,75 @@ If you need any of these fields for your use case/workflow, consider opening an 
 ```cmake
 sbom_add_file(
 	<filename>
-	[FILETYPE <types>...]
-	[RELATIONSHIP <string>]
 	[SPDXID <id>]
+	[RELATIONSHIP <string>]
+	[FILETYPE <SOURCE|BINARY|ARCHIVE|APPLICATION|AUDIO|IMAGE|TEXT|VIDEO|DOCUMENTATION|SPDX|OTHER>...]
+	[CHECKSUM <MD5|SHA224|SHA256|SHA386|SHA512|SHA3_256|SHA3_384|SHA3_512>...]
+	[LICENSE <NOASSERTION|NONE|<SPDX License Expression>> [COMMENT <comment_text>]]
+	[COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
+	[COMMENT <comment_text>]
+	[NOTICE <notice_text>]
+	[CONTRIBUTORS <contributors>...]
+	[ATTRIBUTION <attribution_text>...]
 )
 ```
 
-- `filename`: A path to the file to add, relative to `CMAKE_INSTALL_PREFIX`. Generator expressions are supported.
-- `FILETYPE`: One or more file types. Refer to the [SPDX specification Clause 8.3](https://spdx.github.io/spdx-spec/v2.3/file-information/#83-file-type-field).
-- `RELATIONSHIP`: A relationship definition related to this file. The string `@SBOM_LAST_SPDXID@` will be replaced by the SPDXID that is used for this SBOM item. Refer to the [SPDX specification](https://spdx.github.io/spdx-spec/v2.3/).
-- `SPDXID`: The ID to use for identifier generation. By default, generate a new one. Whether or not this is specified, the variable `SBOM_LAST_SPDXID` is set to just generated/used SPDXID, which could be used for later relationship definitions.
+- `filename`: A path to the file to add, relative to `CMAKE_INSTALL_PREFIX`.
+  - Generator expressions are supported.
+  - See [SPDX clause 8.1](https://spdx.github.io/spdx-spec/v2.3/file-information/#81-file-name-field) for more information.
+- `SPDXID`: The ID to use for identifier generation.
+  - If omitted generates a new one.
+  - See [SPDX clause 8.2](https://spdx.github.io/spdx-spec/v2.3/file-information/#82-file-spdx-identifier-field) for more information.
+  - Whether or not this is specified, the variable `SBOM_LAST_SPDXID` is set to just generated/used SPDXID, which could be used for later relationship definitions.
+- `RELATIONSHIP`: A relationship definition related to this file.
+  - If omitted a default relationship is added: `SPDXRef-${PACKAGE_NAME} CONTAINS @SBOM_LAST_SPDXID@`
+    - `${PACKAGE_NAME}` is the `PACKAGE_NAME` argument given to `sbom_generate()`.
+  - See [SPDX clause 11](https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/) for more information.
+  - The string `@SBOM_LAST_SPDXID@` will be replaced by the SPDXID that is used for this SBOM item.
+  - ***Limitation:***
+    - This will ***replace*** the default relationship added.
+    - Only one relationship can be added.
+- `FILETYPE`: One or more file types.
+  - If omitted, no SBOM entry is generated.
+  - See [SPDX clause 8.3](https://spdx.github.io/spdx-spec/v2.3/file-information/#83-file-type-field) for more information.
+  - One or many of the following keywords:
+    - `SOURCE`, `BINARY`, `ARCHIVE`, `APPLICATION`, `AUDIO`, `IMAGE`, `TEXT`, `VIDEO`, `DOCUMENTATION`, `SPDX`, `OTHER`.
+  - Usage:
+    - `sbom_add_file(... FILETYPE "SOURCE" "TEXT" ...)`
+    - `sbom_add_file(... FILETYPE "BINARY" ...)`
+    - `sbom_add_file(... FILETYPE "ARCHIVE" ...)`
+- `CHECKSUM`: Checksums to be generated for the file.
+  - The SPDX-Specification requires a SHA1 checksum to be generated. This is always done automatically.
+  - With this argument, additional checksums can be specified.
+  - See [SPDX clause 8.4](https://spdx.github.io/spdx-spec/v2.3/file-information/#84-file-checksum-field) for more information.
+  - One or many of the following keywords:
+    - `MD5`, `SHA224`, `SHA256`, `SHA384`, `SHA512`, `SHA3_256`, `SHA3_384`, `SHA3_512`.
+    - These are the set of hash algorithms that CMake supports and are defined in the SPDX specification.
+  - Usage:
+    - `sbom_add_file(... CHECKSUM SHA256 SHA3_512 ...)`
+- `LICENSE`: License of the file.
+  - If omitted, defaults to `NOASSERTION`.
+  - See [SPDX clause 8.5](https://spdx.github.io/spdx-spec/v2.3/file-information/#85-concluded-license-field) for more information.
+  - Either `NOASSERTION`, `NONE`, or a valid SPDX license expression must follow `LICENSE`.
+  - Optionally, add `COMMENT` to record any additional information that went in to arriving at the concluded license.
+    - No SBOM entry when omitted.
+    - See [SPDX clause 8.7](https://spdx.github.io/spdx-spec/v2.3/file-information/#87-comments-on-license-field) for more information.
+- `COPYRIGHT`: Copyright information.
+  - When omitted defaults to `NOASSERTION`.
+  - See [SPDX clause 8.8](https://spdx.github.io/spdx-spec/v2.3/file-information/#88-copyright-text-field) for more information.
+  - Either `NOASSERTION`, `NONE`, or a `<copyright_text>` must follow `COPYRIGHT`.
+- `COMMENT`: Additional comments about the file.
+  - No SBOM entry when omitted.
+  - See [SPDX clause 8.12](https://spdx.github.io/spdx-spec/v2.3/file-information/#812-file-comment-field) for more information.
+- `NOTICE`: Notice text.
+  - No SBOM entry when omitted.
+  - See [SPDX clause 8.13](https://spdx.github.io/spdx-spec/v2.3/file-information/#813-file-notice-field) for more information.
+- `CONTRIBUTORS`: Contributors to the file.
+  - No SBOM entry when omitted.
+  - See [SPDX clause 8.14](https://spdx.github.io/spdx-spec/v2.3/file-information/#814-file-contributor-field) for more information.
+- `ATTRIBUTION`: Attribution text.
+  - No SBOM entry when omitted.
+  - See [SPDX clause 8.15](https://spdx.github.io/spdx-spec/v2.3/file-information/#815-file-attribution-text-field) for more information.
 
 2 specializations of this function are provided.
 
@@ -326,9 +385,10 @@ sbom_add_directory(
 )
 ```
 
-- `path`: A path to the directory, relative to `CMAKE_INSTALL_PREFIX`, for which all files are to be added to the SBOM recursively. Generator expressions are supported.
+- `path`: A path to the directory, relative to `CMAKE_INSTALL_PREFIX`, for which all files are to be added to the SBOM recursively.
+  - Generator expressions are supported.
 
-The supported options for `sbom_add_directory` are the same as those for [`sbom_add_file`](#sbom_add_file), with the exception of `SPDXID`. The `SPDXID` will be autogenerated.
+The supported options for `sbom_add_directory` are the same as those for [`sbom_add_file`](#sbom_add_file).
 
 #### `sbom_add_target`
 
@@ -339,9 +399,10 @@ sbom_add_target(
 )
 ```
 
-- `name`: Corresponds to the logical target name. Only executables are supported. It is assumed that the binary is installed under `CMAKE_INSTALL_BINDIR`.
+- `name`: Corresponds to the logical target name.
+  - It is required that the binaries are installed under `CMAKE_INSTALL_BINDIR`.
 
-The supported options for `sbom_add_target` are the same as those for [`sbom_add_file`](#sbom_add_file), with the exception of `FILETYPE`. The `FILETYPE` is set to BINARY.
+The supported options for `sbom_add_target` are the same as those for [`sbom_add_file`](#sbom_add_file), with the exception of `FILETYPE`. The `FILETYPE` argument is set to BINARY.
 
 ### `sbom_add_package`
 
@@ -384,7 +445,7 @@ sbom_add_package(
   - It is assumed that this package is a dependency of the project.
 - `SPDXID`: The ID to use for identifier generation. (spdx clause 7.2)
   - By default, generate a new one. Whether or not this is specified, the variable `SBOM_LAST_SPDXID` is set to just generated/used SPDXID, which could be used for later relationship definitions.
-- `RELATIONSHIP`: A relationship definition related to this file.
+- `RELATIONSHIP`: A relationship definition related to this package.
   - If omitted a default relationship is added: `SPDXRef-${PACKAGE_NAME} DEPENDS_ON @SBOM_LAST_SPDXID@`
     - `${PACKAGE_NAME}` is the `PACKAGE_NAME` argument given to `sbom_generate()`.
   - See [SPDX clause 11](https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/) for more information.

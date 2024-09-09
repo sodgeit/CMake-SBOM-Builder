@@ -507,7 +507,6 @@ function(_sbom_parse_dates pkg_dates_arg out_BUILD out_RELEASE out_VALID_UNTIL)
 	endforeach()
 endfunction()
 
-
 function(_sbom_parse_package_notes pkg_notes_arg out_pkg_SUMMARY out_pkg_DESC out_pkg_COMMENT)
 	set(oneValueArgs "SUMMARY;DESC;COMMENT")
 	cmake_parse_arguments(_arg_notes "" "${oneValueArgs}" "" ${pkg_notes_arg})
@@ -533,6 +532,24 @@ function(_sbom_parse_package_purpose pkg_purpose_arg out_purpose_list)
 	endforeach()
 
 	set(${out_purpose_list} "${${out_purpose_list}}" PARENT_SCOPE)
+endfunction()
+
+function(_sbom_parse_filetype file_type_arg out_filetype_list)
+	# https://spdx.github.io/spdx-spec/v2.3/file-information/#83-file-type-field
+	set(valid_entries "SOURCE;BINARY;ARCHIVE;APPLICATION;AUDIO;IMAGE;TEXT;VIDEO;DOCUMENTATION;SPDX;OTHER")
+	cmake_parse_arguments(_arg_filetype "${valid_entries}" "" "" ${file_type_arg})
+	if(DEFINED _arg_filetype_UNPARSED_ARGUMENTS)
+		message(FATAL_ERROR "Unkown keywords for FILETYPE: ${_arg_filetype_UNPARSED_ARGUMENTS}")
+	endif()
+
+	set(${out_filetype_list} "")
+	foreach(entry ${valid_entries})
+		if(_arg_filetype_${entry})
+			list(APPEND ${out_filetype_list} ${entry})
+		endif()
+	endforeach()
+
+	set(${out_filetype_list} "${${out_filetype_list}}" PARENT_SCOPE)
 endfunction()
 
 # Starts SBOM generation. Call sbom_add() and friends afterwards. End with sbom_finalize(). Input
@@ -808,94 +825,164 @@ macro(_sbom_builder_is_setup)
 	endif()
 endmacro()
 
-function(_sbom_verify_filetype FILETYPE)
-	# https://spdx.github.io/spdx-spec/v2.3/file-information/#83-file-type-field
-	set(valid_entries "SOURCE" "BINARY" "ARCHIVE" "APPLICATION" "AUDIO" "IMAGE" "TEXT" "VIDEO" "DOCUMENTATION" "SPDX" "OTHER")
-	list(FIND valid_entries "${FILETYPE}" _index)
-
-	if(${_index} EQUAL -1)
-		message(FATAL_ERROR "Invalid FILETYPE: ${FILETYPE}")
-	endif()
-endfunction()
-
 # Append a file to the SBOM. Use this after calling sbom_generate().
-function(sbom_add_file FILENAME)
-	set(options OPTIONAL)
-	set(oneValueArgs RELATIONSHIP SPDXID)
-	set(multiValueArgs FILETYPE)
-	cmake_parse_arguments(SBOM_FILE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+function(_sbom_add_path PATH)
+	set(options OPTIONAL FILE DIR)
+	set(oneValueArgs SPDXID
+					 RELATIONSHIP
+					 COPYRIGHT
+					 COMMENT
+					 NOTICE
+					 CONTRIBUTORS
+					 ATTRIBUTION
+					 )
+	set(multiValueArgs FILETYPE CHECKSUM LICENSE)
+	cmake_parse_arguments(_arg_add_path "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
 	_sbom_builder_is_setup()
 
-	if(SBOM_FILE_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${SBOM_FILE_UNPARSED_ARGUMENTS}")
+	if(_arg_add_path_UNPARSED_ARGUMENTS)
+		message(FATAL_ERROR "Unknown arguments: ${_arg_add_path_UNPARSED_ARGUMENTS}")
 	endif()
-
-	if(NOT DEFINED SBOM_FILE_FILETYPE)
-		message(FATAL_ERROR "Missing FILETYPE argument")
-	endif()
-
-	foreach(_filetype ${SBOM_FILE_FILETYPE})
-		_sbom_verify_filetype("${_filetype}")
-	endforeach()
 
 	sbom_spdxid(
-		VARIABLE SBOM_FILE_SPDXID
-		CHECK "${SBOM_FILE_SPDXID}"
-		HINTS "SPDXRef-${FILENAME}"
+		VARIABLE _arg_add_path_SPDXID
+		CHECK "${_arg_add_path_SPDXID}"
+		HINTS "SPDXRef-${PATH}"
 	)
+	set(SBOM_LAST_SPDXID "${_arg_add_path_SPDXID}" PARENT_SCOPE)
 
-	set(SBOM_LAST_SPDXID "${SBOM_FILE_SPDXID}" PARENT_SCOPE)
+	set(_fields "")
 
-	if("${SBOM_FILE_RELATIONSHIP}" STREQUAL "")
-		set(SBOM_FILE_RELATIONSHIP "SPDXRef-${_sbom_project} CONTAINS ${SBOM_FILE_SPDXID}")
+	if(DEFINED _arg_add_path_FILETYPE)
+		_sbom_parse_filetype("${_arg_add_path_FILETYPE}" _arg_add_path_FILETYPE)
+		foreach(_filetype ${_arg_add_path_FILETYPE})
+			string(APPEND _fields "\nFileType: ${_filetype}")
+		endforeach()
+	endif()
+
+	if(DEFINED _arg_add_path_CHECKSUM)
+		set(_hash_algo "SHA1") # SHA1 is always required
+		set(_supported_algorithms "MD5;SHA224;SHA256;SHA384;SHA512;SHA3-256;SHA3-384;SHA3-512")
+		foreach(_checksum ${_arg_add_path_CHECKSUM})
+			if("${_checksum}" IN_LIST _supported_algorithms)
+				list(APPEND _hash_algo "${_checksum}")
+			else()
+				message(FATAL_ERROR "Unsupported checksum algorithm: ${_checksum}")
+			endif()
+		endforeach()
+	endif()
+
+	set(_arg_add_path_LICENSE_CONCLUDED "NOASSERTION")
+	set(_arg_add_path_LICENSE_DECLARED "NOASSERTION")
+	if(DEFINED _arg_add_path_LICENSE)
+		_sbom_parse_license("CONCLUDED;${_arg_add_path_LICENSE}" _arg_add_path_LICENSE_CONCLUDED _arg_add_path_LICENSE_DECLARED _arg_add_path_LICENSE_COMMENT)
+	endif()
+	string(APPEND _fields "\nLicenseConcluded: ${_arg_add_path_LICENSE_CONCLUDED}")
+	if(DEFINED _arg_add_path_LICENSE_COMMENT)
+		string(APPEND _fields "\nLicenseComments: ${_arg_add_path_LICENSE_COMMENT}")
+	endif()
+
+	if(NOT DEFINED _arg_add_path_COPYRIGHT)
+		set(_arg_add_path_COPYRIGHT "NOASSERTION")
+	endif()
+	string(APPEND _fields "\nFileCopyrightText: ${_arg_add_path_COPYRIGHT}")
+
+	if(DEFINED _arg_add_path_COMMENT)
+		string(APPEND _fields "\nComment: ${_arg_add_path_COMMENT}")
+	endif()
+
+	if(DEFINED _arg_add_path_NOTICE)
+		string(APPEND _fields "\nFileNotice: ${_arg_add_path_NOTICE}")
+	endif()
+
+	if(DEFINED _arg_add_path_CONTRIBUTORS)
+		foreach(_contributor ${_arg_add_path_CONTRIBUTORS})
+			string(APPEND _fields "\nFileContributor: ${_contributor}")
+		endforeach()
+	endif()
+
+	if(DEFINED _arg_add_path_ATTRIBUTION)
+		foreach(_attribution ${_arg_add_path_ATTRIBUTION})
+			string(APPEND _fields "\nFileAttributionText: ${_attribution}")
+		endforeach()
+	endif()
+
+	if(NOT DEFINED _arg_add_path_RELATIONSHIP)
+		set(_arg_add_path_RELATIONSHIP "SPDXRef-${_sbom_project} CONTAINS ${_arg_add_path_SPDXID}")
 	else()
-		string(REPLACE "@SBOM_LAST_SPDXID@" "${SBOM_FILE_SPDXID}" SBOM_FILE_RELATIONSHIP
-			"${SBOM_FILE_RELATIONSHIP}"
-		)
+		string(REPLACE "@SBOM_LAST_SPDXID@" "${_arg_add_path_SPDXID}" _arg_add_path_RELATIONSHIP "${_arg_add_path_RELATIONSHIP}")
 	endif()
 
 	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 
-	_sbom_append_sbom_snippet("${SBOM_FILE_SPDXID}.cmake")
+	_sbom_append_sbom_snippet("${_arg_add_path_SPDXID}.cmake")
 	file(
 		GENERATE
-		OUTPUT ${_sbom_snippet_dir}/${SBOM_FILE_SPDXID}.cmake
+		OUTPUT ${_sbom_snippet_dir}/${_arg_add_path_SPDXID}.cmake
 		CONTENT
 		"
 cmake_policy(SET CMP0011 NEW)
 cmake_policy(SET CMP0012 NEW)
-if(NOT EXISTS \${CMAKE_INSTALL_PREFIX}/${FILENAME})
-	if(NOT ${SBOM_FILE_OPTIONAL})
-		message(FATAL_ERROR \"Cannot find ${FILENAME}\")
+
+set(ADDING_DIR ${_arg_add_path_DIR})
+
+set(_files \"\")
+if(NOT ADDING_DIR)
+	set(_files \"./${PATH}\")
+else()
+	file(GLOB_RECURSE _files
+		LIST_DIRECTORIES false RELATIVE \"\${CMAKE_INSTALL_PREFIX}\"
+		\"\${CMAKE_INSTALL_PREFIX}/${PATH}/*\"
+)
+endif()
+
+if((NOT ADDING_DIR) AND (NOT EXISTS \${CMAKE_INSTALL_PREFIX}/${PATH}))
+	if(NOT ${_arg_add_path_OPTIONAL})
+		message(FATAL_ERROR \"Cannot find ./${PATH}\")
 	endif()
 else()
-	file(SHA1 \${CMAKE_INSTALL_PREFIX}/${FILENAME} _sha1)
-	list(APPEND SBOM_VERIFICATION_CODES \${_sha1})
-	file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
-\"
-FileName: ./${FILENAME}
-SPDXID: ${SBOM_FILE_SPDXID}
-\"
-	)
-	foreach(_filetype ${SBOM_FILE_FILETYPE})
+	set(_count 0)
+	set(_rel \"${_arg_add_path_RELATIONSHIP}\")
+	set(_id \"${_arg_add_path_SPDXID}\")
+	foreach(_f IN LISTS _files)
+		if(ADDING_DIR)
+			set(_rel \"${_arg_add_path_RELATIONSHIP}-\${_count}\")
+			set(_id \"${_arg_add_path_SPDXID}-\${_count}\")
+			math(EXPR _count \"\${_count} + 1\")
+		endif()
+		set(_checksum_fields \"\")
+		foreach(_algo ${_hash_algo})
+			file(\${_algo} \${CMAKE_INSTALL_PREFIX}/\${_f} _hash)
+			if(\"\${_algo}\" STREQUAL \"SHA1\")
+				list(APPEND SBOM_VERIFICATION_CODES \${_hash})
+			endif()
+			string(APPEND _checksum_fields \"\\nFileChecksum: \${_algo}: \${_hash}\")
+		endforeach()
 		file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
-\"FileType: \${_filetype}
 \"
-		)
-	endforeach()
-	file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
-\"FileChecksum: SHA1: \${_sha1}
-LicenseConcluded: NOASSERTION
-LicenseInfoInFile: NOASSERTION
-FileCopyrightText: NOASSERTION
-Relationship: ${SBOM_FILE_RELATIONSHIP}
+FileName: ./\${_f}
+SPDXID: \${_id}\
+${_fields}\
+\${_checksum_fields}
+Relationship: \${_rel}
 \"
 	)
+	endforeach()
 endif()
 	"
 	)
 
+	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
+endfunction()
+
+function(sbom_add_directory DIR_PATH)
+	_sbom_add_path("${DIR_PATH}" "DIR" "${ARGN}")
+	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
+endfunction()
+
+function(sbom_add_file FILENAME)
+	_sbom_add_path("${FILENAME}" "${ARGN}")
 	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
 endfunction()
 
@@ -934,86 +1021,6 @@ function(sbom_add_target NAME)
 	endif()
 
 	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
-endfunction()
-
-# Append all files recursively in a directory to the SBOM. Use this after calling sbom_generate().
-function(sbom_add_directory PATH)
-	cmake_parse_arguments(
-		SBOM_DIRECTORY "" "RELATIONSHIP" "FILETYPE" ${ARGN}
-	)
-
-	_sbom_builder_is_setup()
-
-	if(SBOM_DIRECTORY_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${SBOM_DIRECTORY_UNPARSED_ARGUMENTS}")
-	endif()
-
-	sbom_spdxid(VARIABLE SBOM_DIRECTORY_SPDXID HINTS "SPDXRef-${PATH}")
-
-	set(SBOM_LAST_SPDXID "${SBOM_DIRECTORY_SPDXID}")
-
-	if(NOT DEFINED SBOM_DIRECTORY_FILETYPE)
-		message(FATAL_ERROR "Missing FILETYPE argument")
-	endif()
-
-	foreach(_filetype ${SBOM_DIRECTORY_FILETYPE})
-		_sbom_verify_filetype("${_filetype}")
-	endforeach()
-
-	if("${SBOM_DIRECTORY_RELATIONSHIP}" STREQUAL "")
-		set(SBOM_DIRECTORY_RELATIONSHIP
-			"SPDXRef-${_sbom_project} CONTAINS ${SBOM_DIRECTORY_SPDXID}"
-		)
-	else()
-		string(REPLACE "@SBOM_LAST_SPDXID@" "${SBOM_DIRECTORY_SPDXID}"
-			SBOM_DIRECTORY_RELATIONSHIP "${SBOM_DIRECTORY_RELATIONSHIP}"
-		)
-	endif()
-
-	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
-
-	_sbom_append_sbom_snippet("${SBOM_DIRECTORY_SPDXID}.cmake")
-	file(
-		GENERATE
-		OUTPUT "${_sbom_snippet_dir}/${SBOM_DIRECTORY_SPDXID}.cmake"
-		CONTENT
-		"
-file(GLOB_RECURSE _files
-	LIST_DIRECTORIES false RELATIVE \"\${CMAKE_INSTALL_PREFIX}\"
-	\"\${CMAKE_INSTALL_PREFIX}/${PATH}/*\"
-)
-
-set(_count 0)
-foreach(_f IN LISTS _files)
-	file(SHA1 \"\${CMAKE_INSTALL_PREFIX}/\${_f}\" _sha1)
-	list(APPEND SBOM_VERIFICATION_CODES \${_sha1})
-	file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
-\"
-FileName: ./\${_f}
-SPDXID: ${SBOM_DIRECTORY_SPDXID}-\${_count}
-\"
-	)
-	foreach(_filetype ${SBOM_DIRECTORY_FILETYPE})
-		file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
-\"FileType: \${_filetype}
-\"
-		)
-	endforeach()
-	file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
-\"FileChecksum: SHA1: \${_sha1}
-FileChecksum: SHA1: \${_sha1}
-LicenseConcluded: NOASSERTION
-LicenseInfoInFile: NOASSERTION
-FileCopyrightText: NOASSERTION
-Relationship: ${SBOM_DIRECTORY_RELATIONSHIP}-\${_count}
-\"
-	)
-	math(EXPR _count \"\${_count} + 1\")
-endforeach()
-"
-	)
-
-	set(SBOM_LAST_SPDXID "" PARENT_SCOPE)
 endfunction()
 
 # Append a package (without files) to the SBOM. Use this after calling sbom_generate().
