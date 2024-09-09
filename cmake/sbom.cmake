@@ -433,24 +433,96 @@ function(_sbom_append_sbom_snippet SNIPPET_SCRIPT)
 	)
 endfunction()
 
-function(_sbom_parse_package_notes pkg_notes_arg out_pkg_summary out_pkg_desc out_pkg_comment)
-	cmake_parse_arguments(_arg "" "SUMMARY;DESC;COMMENT" "" ${pkg_notes_arg})
-	if(_arg_SUMMARY)
-		set(${out_pkg_summary} "${_arg_SUMMARY}" PARENT_SCOPE)
+function(_sbom_parse_package_supplier pkg_supplier_arg out_supplier_type out_supplier_name out_supplier_email)
+	cmake_parse_arguments(_arg_supplier "NOASSERTION" "ORGANIZATION;PERSON;EMAIL" "" ${pkg_supplier_arg})
+
+	if(_arg_supplier_UNPARSED_ARGUMENTS)
+		message(FATAL_ERROR "Unknown subarguments passed to SUPPLIER: ${_arg_supplier_UNPARSED_ARGUMENTS}")
 	endif()
-	if(_arg_DESC)
-		set(${out_pkg_desc} "${_arg_DESC}" PARENT_SCOPE)
+
+	if(_arg_supplier_NOASSERTION)
+		set(${out_supplier_type} "NOASSERTION" PARENT_SCOPE)
+		return()
 	endif()
-	if(_arg_COMMENT)
-		set(${out_pkg_comment} "${_arg_COMMENT}" PARENT_SCOPE)
+	if((NOT DEFINED _arg_supplier_PERSON) AND (NOT DEFINED _arg_supplier_ORGANIZATION))
+		message(FATAL_ERROR "Missing <NOASSERTION|PERSON|ORGANIZATION> <name> for argument SUPPLIER.")
+	elseif(DEFINED _arg_supplier_PERSON AND DEFINED _arg_supplier_ORGANIZATION)
+		message(FATAL_ERROR "Specify either PERSON or ORGANIZATION, not both.")
 	endif()
+
+	if(DEFINED _arg_supplier_PERSON)
+		set(${out_supplier_type} "Person:" PARENT_SCOPE)
+		set(${out_supplier_name} "${_arg_supplier_PERSON}" PARENT_SCOPE)
+	elseif(DEFINED _arg_supplier_ORGANIZATION)
+		set(${out_supplier_type} "Organization:" PARENT_SCOPE)
+		set(${out_supplier_name} "${_arg_supplier_ORGANIZATION}" PARENT_SCOPE)
+	endif()
+
+	if(DEFINED _arg_supplier_EMAIL)
+		set(${out_supplier_email} "${_arg_supplier_EMAIL}" PARENT_SCOPE)
+	endif()
+endfunction()
+
+function(_sbom_parse_license pkg_license_arg out_license_concluded out_license_declared out_license_comment)
+	cmake_parse_arguments(_arg_license "" "CONCLUDED;DECLARED;COMMENT" "" ${pkg_license_arg})
+
+	if(_arg_license_UNPARSED_ARGUMENTS)
+		message(FATAL_ERROR "Unknown subarguments for LICENSE: ${_arg_license_UNPARSED_ARGUMENTS}")
+	endif()
+
+	if(DEFINED _arg_license_CONCLUDED)
+		set(${out_license_concluded} "${_arg_license_CONCLUDED}" PARENT_SCOPE)
+	else()
+		set(${out_license_concluded} "NOASSERTION" PARENT_SCOPE)
+	endif()
+
+	if(DEFINED _arg_license_DECLARED)
+		set(${out_license_declared} "${_arg_license_DECLARED}" PARENT_SCOPE)
+	else()
+		set(${out_license_declared} "NOASSERTION" PARENT_SCOPE)
+	endif()
+
+	if(DEFINED _arg_license_COMMENT)
+		set(${out_license_comment} "${_arg_license_COMMENT}" PARENT_SCOPE)
+	endif()
+endfunction()
+
+function(_sbom_parse_dates pkg_dates_arg out_BUILD out_RELEASE out_VALID_UNTIL)
+	set(oneValueArgs BUILT RELEASE VALID_UNTIL)
+	cmake_parse_arguments(_arg_dates "" "${oneValueArgs}" "" ${pkg_dates_arg})
+
+	if(_arg_dates_UNPARSED_ARGUMENTS)
+		message(FATAL_ERROR "Unknown subarguments for DATE: ${_arg_dates_UNPARSED_ARGUMENTS}")
+	endif()
+
+	foreach(_date ${oneValueArgs})
+		if(DEFINED _arg_dates_${_date})
+			string(REGEX MATCH "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" _arg_dates_${_date} ${_arg_dates_${_date}})
+			if(NOT _arg_dates_${_date})
+				message(FATAL_ERROR "Invalid date format for ${_date}: ${_arg_dates_${_date}}")
+			endif()
+			set(${out_${_date}} "${_arg_dates_${_date}}" PARENT_SCOPE)
+		endif()
+
+	endforeach()
+endfunction()
+
+
+function(_sbom_parse_package_notes pkg_notes_arg out_pkg_SUMMARY out_pkg_DESC out_pkg_COMMENT)
+	set(oneValueArgs "SUMMARY;DESC;COMMENT")
+	cmake_parse_arguments(_arg_notes "" "${oneValueArgs}" "" ${pkg_notes_arg})
+	foreach(_note_type ${oneValueArgs})
+		if(DEFINED _arg_notes_${_note_type})
+			set(${out_pkg_${_note_type}} "${_arg_notes_${_note_type}}" PARENT_SCOPE)
+		endif()
+	endforeach()
 endfunction()
 
 function(_sbom_parse_package_purpose pkg_purpose_arg out_purpose_list)
 	set(options "APPLICATION;FRAMEWORK;LIBRARY;CONTAINER;OPERATING-SYSTEM;DEVICE;FIRMWARE;SOURCE;ARCHIVE;FILE;INSTALL;OTHER")
 	cmake_parse_arguments(_arg "${options}" "" "" ${pkg_purpose_arg})
 	if(_arg_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${_arg_UNPARSED_ARGUMENTS}")
+		message(FATAL_ERROR "Unknown keywords for PURPOSE: ${_arg_UNPARSED_ARGUMENTS}")
 	endif()
 
 	set(${out_purpose_list} "")
@@ -947,105 +1019,186 @@ endfunction()
 # Append a package (without files) to the SBOM. Use this after calling sbom_generate().
 function(sbom_add_package NAME)
 	set(oneValueArgs
-		VERSION
-		LICENSE
-		DOWNLOAD_LOCATION
-		RELATIONSHIP
 		SPDXID
-		SUPPLIER
+		RELATIONSHIP
+		VERSION
+		FILENAME
+		DOWNLOAD
+		URL
+		SOURCE_INFO
+		COPYRIGHT
 	)
-	set(multiValueArgs EXTREF)
+	set(multiValueArgs
+		SUPPLIER
+		ORIGINATOR
+		CHECKSUM
+		EXTREF
+		LICENSE
+		NOTES
+		ATTRIBUTION
+		PURPOSE
+		DATE
+	)
 	cmake_parse_arguments(
-		SBOM_PACKAGE "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
+		_args "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
 	)
 
 	_sbom_builder_is_setup()
 
-	if(SBOM_PACKAGE_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${SBOM_PACKAGE_UNPARSED_ARGUMENTS}")
-	endif()
-
-	if("${SBOM_PACKAGE_DOWNLOAD_LOCATION}" STREQUAL "")
-		set(SBOM_PACKAGE_DOWNLOAD_LOCATION NOASSERTION)
+	if(_args_UNPARSED_ARGUMENTS)
+		message(FATAL_ERROR "Unknown arguments: ${_args_UNPARSED_ARGUMENTS}")
 	endif()
 
 	sbom_spdxid(
-		VARIABLE SBOM_PACKAGE_SPDXID
-		CHECK "${SBOM_PACKAGE_SPDXID}"
+		VARIABLE _args_SPDXID
+		CHECK "${_args_SPDXID}"
 		HINTS "SPDXRef-${NAME}"
 	)
 
-	set(SBOM_LAST_SPDXID ${SBOM_PACKAGE_SPDXID} PARENT_SCOPE)
+	set(SBOM_LAST_SPDXID ${_args_SPDXID} PARENT_SCOPE)
 
-	set(_fields)
+	set(_fields "PackageName: ${NAME}\nSPDXID: ${_args_SPDXID}")
 
-	if("${SBOM_PACKAGE_VERSION}" STREQUAL "")
-		set(SBOM_PACKAGE_VERSION "unknown")
+	if(DEFINED _args_VERSION)
+		string(APPEND _fields "\nPackageVersion: ${_args_VERSION}")
+	endif()
 
-		if(${SBOM_CHECKS_ENABLED})
-			message(WARNING "Version missing for package: ${NAME}. (semver/commit-hash)")
+	if(DEFINED _args_FILENAME)
+		string(APPEND _fields "\nPackageFileName: ${_args_FILENAME}")
+	endif()
+
+	if(DEFINED _args_SUPPLIER)
+		set(_supplier_field_txt "")
+		_sbom_parse_package_supplier("${_args_SUPPLIER}" _args_SUPPLIER_TYPE _args_SUPPLIER_NAME _args_SUPPLIER_EMAIL)
+		if("${_args_SUPPLIER_TYPE}" STREQUAL "NOASSERTION")
+			set(_supplier_field_txt "PackageSupplier: NOASSERTION")
+		else()
+			set(_supplier_field_txt "PackageSupplier: ${_args_SUPPLIER_TYPE} ${_args_SUPPLIER_NAME}")
+			if(DEFINED _args_SUPPLIER_EMAIL)
+				set(_supplier_field_txt "${_supplier_field_txt} (${_args_SUPPLIER_EMAIL})")
+			endif()
+		endif()
+		string(APPEND _fields "\n${_supplier_field_txt}")
+	endif()
+
+	if(DEFINED _args_ORIGINATOR)
+		set(_originator_field_txt "")
+		_sbom_parse_package_supplier("${_args_ORIGINATOR}" _args_ORIGINATOR_TYPE _args_ORIGINATOR_NAME _args_ORIGINATOR_EMAIL)
+		if("${_args_ORIGINATOR_TYPE}" STREQUAL "NOASSERTION")
+			set(_originator_field_txt "PackageOriginator: NOASSERTION")
+		else()
+			set(_originator_field_txt "PackageOriginator: ${_args_ORIGINATOR_TYPE} ${_args_ORIGINATOR_NAME}")
+			if(DEFINED _args_ORIGINATOR_EMAIL)
+				set(_originator_field_txt "${_originator_field_txt} (${_args_ORIGINATOR_EMAIL})")
+			endif()
+		endif()
+		string(APPEND _fields "\n${_originator_field_txt}")
+	endif()
+
+	if(NOT DEFINED _args_DOWNLOAD)
+		set(_args_DOWNLOAD "NOASSERTION")
+	endif()
+	string(APPEND _fields "\nPackageDownloadLocation: ${_args_DOWNLOAD}")
+
+	if(DEFINED _args_CHECKSUM)
+		set(_algo TRUE) #first string is the algorithm, second is the checksum
+		set(_checksum_field_txt "")
+		foreach(_checksum IN LISTS _args_CHECKSUM)
+			if(_algo)
+				set(_algo FALSE)
+				set(_checksum_field_txt "${_checksum_field_txt}\nPackageChecksum: ${_checksum}:")
+			else()
+				set(_algo TRUE)
+				set(_checksum_field_txt "${_checksum_field_txt} ${_checksum}")
+			endif()
+		endforeach()
+		string(APPEND _fields "${_checksum_field_txt}")
+	endif()
+
+	if(DEFINED _args_URL)
+		string(APPEND _fields "\nPackageHomePage: ${_args_URL}")
+	endif()
+
+	if(DEFINED _args_SOURCE_INFO)
+		string(APPEND _fields "\nPackageSourceInfo: ${_args_URL}")
+	endif()
+
+	set(_args_LICENSE_CONCLUDED "NOASSERTION")
+	set(_args_LICENSE_DECLARED "NOASSERTION")
+	if(DEFINED _args_LICENSE)
+		_sbom_parse_license("CONCLUDED;${_args_LICENSE}" _args_LICENSE_CONCLUDED _args_LICENSE_DECLARED _args_LICENSE_COMMENT)
+	endif()
+	string(APPEND _fields "\nPackageLicenseConcluded: ${_args_LICENSE_CONCLUDED}\nPackageLicenseDeclared: ${_args_LICENSE_DECLARED}")
+	if(DEFINED _args_LICENSE_COMMENT)
+		string(APPEND _fields "\nPackageLicenseComments: ${_args_LICENSE_COMMENT}")
+	endif()
+
+	if(NOT DEFINED _args_COPYRIGHT)
+		set(_args_COPYRIGHT "NOASSERTION")
+	endif()
+	string(APPEND _fields "\nPackageCopyrightText: ${_args_COPYRIGHT}")
+
+	if(DEFINED _args_NOTES)
+		_sbom_parse_package_notes("${_args_NOTES}" _args_SUMMARY _args_DESC _args_COMMENT)
+		if(DEFINED _args_SUMMARY)
+			string(APPEND _fields "\nPackageSummary: <text>${_args_SUMMARY}</text>")
+		endif()
+		if(DEFINED _args_DESC)
+			string(APPEND _fields "\nPackageDescription: <text>${_args_DESC}</text>")
+		endif()
+		if(DEFINED _args_COMMENT)
+			string(APPEND _fields "\nPackageComment: <text>${_args_COMMENT}</text>")
 		endif()
 	endif()
 
-	if("${SBOM_PACKAGE_SUPPLIER}" STREQUAL "")
-		set(SBOM_PACKAGE_SUPPLIER "Person: Anonymous")
-
-		if(${SBOM_CHECKS_ENABLED})
-			message(WARNING "Supplier missing for package: ${NAME}. (Person/Organization + email/url)")
-		endif()
-	endif()
-
-	if(NOT "${SBOM_PACKAGE_LICENSE}" STREQUAL "")
-		set(_fields "${_fields}
-PackageLicenseConcluded: ${SBOM_PACKAGE_LICENSE}"
-		)
-	else()
-		set(_fields "${_fields}
-PackageLicenseConcluded: NOASSERTION"
-		)
-
-		if(${SBOM_CHECKS_ENABLED})
-			message(WARNING "LICENSE missing for package ${NAME}. (SPDX license identifier)")
-		endif()
-	endif()
-
-	foreach(_ref IN LISTS SBOM_PACKAGE_EXTREF)
-		set(_fields "${_fields}
-ExternalRef: ${_ref}"
-		)
+	foreach(_ref IN LISTS _args_EXTREF)
+		string(APPEND _fields "\nExternalRef: ${_ref}")
 	endforeach()
 
-	if("${SBOM_PACKAGE_RELATIONSHIP}" STREQUAL "")
-		set(SBOM_PACKAGE_RELATIONSHIP
-			"SPDXRef-${_sbom_project} DEPENDS_ON ${SBOM_PACKAGE_SPDXID}"
-		)
-	else()
-		string(REPLACE "@SBOM_LAST_SPDXID@" "${SBOM_PACKAGE_SPDXID}"
-			SBOM_PACKAGE_RELATIONSHIP "${SBOM_PACKAGE_RELATIONSHIP}"
-		)
+	if(DEFINED _args_ATTRIBUTION)
+		foreach(_attr IN LISTS _args_ATTRIBUTION)
+			string(APPEND _fields "\nPackageAttributionText: ${_attr}")
+		endforeach()
 	endif()
+
+	if(DEFINED _args_PURPOSE)
+		_sbom_parse_package_purpose("${_args_PURPOSE}" _args_PURPOSE)
+		foreach(_purpose IN LISTS _args_PURPOSE)
+			string(APPEND _fields "\nPrimaryPackagePurpose: ${_purpose}")
+		endforeach()
+	endif()
+
+	if(DEFINED _args_DATE)
+		_sbom_parse_dates("${_args_DATE}" _args_date_Build _args_date_Rel _args_date_VU)
+		if(DEFINED _args_date_Build)
+			string(APPEND _fields "\nBuildDate: ${_args_date_Build}")
+		endif()
+		if(DEFINED _args_date_Rel)
+			string(APPEND _fields "\nReleaseDate: ${_args_date_Rel}")
+		endif()
+		if(DEFINED _args_date_VU)
+			string(APPEND _fields "\nValidUntilDate: ${_args_date_VU}")
+		endif()
+	endif()
+
+	if(NOT DEFINED _args_RELATIONSHIP)
+		set(_args_RELATIONSHIP "SPDXRef-${_sbom_project} DEPENDS_ON ${_args_SPDXID}")
+	else()
+		string(REPLACE "@SBOM_LAST_SPDXID@" "${_args_SPDXID}" _args_RELATIONSHIP "${_args_RELATIONSHIP}")
+	endif()
+	string(APPEND _fields "\nRelationship: ${_args_RELATIONSHIP}\nRelationship: ${_args_SPDXID} CONTAINS NOASSERTION")
 
 	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 
-	_sbom_append_sbom_snippet("${SBOM_PACKAGE_SPDXID}.cmake")
+	_sbom_append_sbom_snippet("${_args_SPDXID}.cmake")
 	file(
 		GENERATE
-		OUTPUT ${_sbom_snippet_dir}/${SBOM_PACKAGE_SPDXID}.cmake
+		OUTPUT ${_sbom_snippet_dir}/${_args_SPDXID}.cmake
 		CONTENT
 		"
 			file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
 \"
-PackageName: ${NAME}
-SPDXID: ${SBOM_PACKAGE_SPDXID}
-ExternalRef: SECURITY cpe23Type ${SBOM_CPE}
-PackageDownloadLocation: ${SBOM_PACKAGE_DOWNLOAD_LOCATION}
-PackageLicenseDeclared: NOASSERTION
-PackageCopyrightText: NOASSERTION
-PackageVersion: ${SBOM_PACKAGE_VERSION}
-PackageSupplier: ${SBOM_PACKAGE_SUPPLIER}
-FilesAnalyzed: false${_fields}
-Relationship: ${SBOM_PACKAGE_RELATIONSHIP}
-Relationship: ${SBOM_PACKAGE_SPDXID} CONTAINS NOASSERTION
+${_fields}
 \"
 			)
 			"

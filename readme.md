@@ -188,9 +188,8 @@ sbom_generate(
    [PACKAGE_URL <NOASSERTION|NONE|<url>>]
    [PACKAGE_LICENSE <NOASSERTION|NONE|<SPDX License Expression>>]
    [PACKAGE_COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
-   [PACKAGE_SUMMARY [SUMMARY <summary_text>]
-                    [DESCRIPTION <description_text>]
-                    [COMMENT <comment_text>] ]
+   [PACKAGE_NOTES [SUMMARY <summary_text>]
+                  [DESCRIPTION <description_text>] ]
    [PACKAGE_PURPOSE <APPLICATION|FRAMEWORK|LIBRARY|
                      CONTAINER|OPERATING-SYSTEM|DEVICE|
                      FIRMWARE|SOURCE|ARCHIVE|
@@ -281,7 +280,7 @@ If you need any of these fields for your use case/workflow, consider opening an 
 - `PackageSourceInfo:` (spdx clause 7.12)
   - This field is optional in the SPDX specification, and can be omitted.
   - Used to record any relevant background information about the origin of the package.
-  - That does not apply to a package that is built by the creator of the SBOM.
+  - This is probably not needed for a package that is built by the creator of the SBOM.
 - `PackageLicenseComments` (spdx clause 7.16)
   - This field is optional in the SPDX specification, and can be omitted.
   - Used to record any additional information that went in to arriving at the concluded license.
@@ -349,22 +348,175 @@ The supported options for `sbom_add_target` are the same as those for [`sbom_add
 ```cmake
 sbom_add_package(
 	<name>
-	[DOWNLOAD_LOCATION <URL>]
-	[EXTREF <ref>...]
-	[LICENSE <string>]
-	[RELATIONSHIP <string>]
 	[SPDXID <id>]
-	[SUPPLIER <name>]
-	[VERSION <version>]
+	[RELATIONSHIP <string>]
+	[VERSION <version_string>]
+	[FILENAME <filename>]
+	[SUPPLIER <NOASSERTION|PERSON|ORGANIZATION> <name> [EMAIL <email>]]
+	[ORIGINATOR <NOASSERTION|PERSON|ORGANIZATION> <name> [EMAIL <email>]]
+	[DOWNLOAD <NOASSERTION|NONE|<url|vcs>>]
+	[CHECKSUM <<algorithm> <checksum>>...]
+	[URL <NOASSERTION|NONE|<url>>]
+	[SOURCE_INFO <source_info_text>]
+	[LICENSE <NOASSERTION|NONE|<SPDX License Expression>>
+	         [DECLARED <NOASSERTION|NONE|<SPDX License Expression>> ]
+	         [COMMENT <comment_text> ] ]
+	[COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
+	[NOTES [SUMMARY <summary_text>]
+	       [DESC <summary_text>]
+		   [COMMENT <summary_text>] ]
+	[EXTREF <<SECURITY|PACKAGE_MANAGER|PERSISTENT-ID|OTHER> <type> <locator> [COMMENT <comment_text>]>...]
+	[ATTRIBUTION <attribution_text>...]
+	[PURPOSE <APPLICATION|FRAMEWORK|LIBRARY|
+			  CONTAINER|OPERATING-SYSTEM|DEVICE|
+			  FIRMWARE|SOURCE|ARCHIVE|
+			  FILE|INSTALL|OTHER>...]
+	[DATE [RELEASE <date>]
+	      [BUILD <date>]
+		  [VALID_UNTIL <date>] ]
+
 )
 ```
 
-- `name`: A package to be added to the SBOM. The name is something that is identifiable by standard tools, so use the name that is given by the author or package manager. The package files are not analysed further. It is assumed that this package is a dependency of the project.
-- `DOWNLOAD_LOCATION`: Package download location. The URL may be used by tools to identify the package.
-- `EXTREF`: External references, such as security or package manager information. Refer to the [SPDX](https://spdx.github.io/spdx-spec/v2.3/) specification for details.
-- `LICENSE`: License of the package. Defaults to `NOASSERTION` when not specified.
-- `SUPPLIER`: Package supplier, which can be `Person: name (email)`, or `Organization: name (email)`.
-- `VERSION`: Version of the package.
+- `name`: Name of the package to be added as a dependency to the SBOM. (spdx clause 7.1)
+  - Use the name that is given by the author or package manager.
+  - The package files are not analysed further.
+  - It is assumed that this package is a dependency of the project.
+- `SPDXID`: The ID to use for identifier generation. (spdx clause 7.2)
+  - By default, generate a new one. Whether or not this is specified, the variable `SBOM_LAST_SPDXID` is set to just generated/used SPDXID, which could be used for later relationship definitions.
+- `RELATIONSHIP`: A relationship definition related to this file.
+  - If omitted a default relationship is added: `SPDXRef-${PACKAGE_NAME} DEPENDS_ON @SBOM_LAST_SPDXID@`
+    - `${PACKAGE_NAME}` is the `PACKAGE_NAME` argument given to `sbom_generate()`.
+  - See [SPDX clause 11](https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/) for more information.
+  - The string `@SBOM_LAST_SPDXID@` will be replaced by the SPDXID that is used for this SBOM item.
+  - Usage:
+    - `sbom_add_package( gtest ...)`
+    - `set(GTEST_SPDX_ID ${SBOM_LAST_SPDXID})`
+    - `sbom_add_package(... RELATIONSHIP "${GTEST_SPDX_ID} TEST_DEPENDENCY_OF @SBOM_LAST_SPDXID@" ...)`
+    - To get the spdx-id of another package, save `SBOM_LAST_SPDXID` in a different variable after calling `sbom_add_package(...)`.
+  - ***Limitation:***
+    - This will ***replace*** the default relationship added, which is: `SPDXRef-${PACKAGE_NAME} DEPENDS_ON @SBOM_LAST_SPDXID@`
+    - Only one relationship can be added.
+    - The Relationship: `@SBOM_LAST_SPDXID@ CONTAINS NOASSERTION` is always added, which can cause confusion.
+- `VERSION`: Package version field
+  - No SBOM entry when omitted.
+  - See [SPDX clause 7.3](https://spdx.github.io/spdx-spec/v2.3/package-information/#73-package-version-field) for more information.
+- `FILENAME`: Filename of the package.
+  - No SBOM entry when omitted.
+  - See [SPDX clause 7.4](https://spdx.github.io/spdx-spec/v2.3/package-information/#74-package-file-name-field) for more information.
+  - Filename of the package as it is distributed.
+  - Can include relative path from `CMAKE_INSTALL_PREFIX` if it part of your install artifacts.
+  - Usage:
+    - `sbom_add_package(... FILENAME "./lib/libmodbus.so" ...)`
+- `SUPPLIER`: Supplier of the Package
+  - No SBOM entry when omitted.
+  - See [SPDX clause 7.5](https://spdx.github.io/spdx-spec/v2.3/package-information/#75-package-supplier-field) for more information.
+  - One of `<NOASSERTION|PERSON|ORGANIZATION>` keywords must follow `SUPPLIER`.
+    - For `NOASSERTION`: `<name>` and `EMAIL` are not used.
+  - `<name>` is either a person or organization name.
+  - `EMAIL` is optional.
+  - Usage:
+    - `sbom_add_package(... SUPPLIER ORGANIZATION "Package Distributor" EMAIL "contact@email.com" ...)`
+    - `sbom_add_package(... SUPPLIER PERSON "Firstname Lastname" ...)`
+    - `sbom_add_package(... SUPPLIER NOASSERTION ...)`
+- `ORIGINATOR`: Originator of the Package
+  - No SBOM entry when omitted.
+  - See [SPDX clause 7.6](https://spdx.github.io/spdx-spec/v2.3/package-information/#76-package-originator-field) for more information.
+  - Same options/keywords as `SUPPLIER`.
+  - The package may be acquired from a different source than the original creator of the package.
+  - Usage:
+    - `sbom_add_package(... ORIGINATOR ORGANIZATION "Package Creator" EMAIL "" ...)`
+    - `sbom_add_package(... ORIGINATOR NOASSERTION ...)`
+- `DOWNLOAD`: Download location of the package.
+  - If omitted, defaults to `NOASSERTION`, as this field is required by SPDX.
+  - See [SPDX clause 7.7](https://spdx.github.io/spdx-spec/v2.3/package-information/#77-package-download-location-field) for more information.
+  - One of `NOASSERTION`, `NONE`, or a `<url|vcs>` must follow `DOWNLOAD`.
+    - `<url|vcs>`: A URL or version control system location.
+- `CHECKSUM`: Checksum of the package.
+  - No SBOM entry when omitted.
+  - See [SPDX clause 7.10](https://spdx.github.io/spdx-spec/v2.3/package-information/#710-package-checksum-field) for more information.
+  - For `<algorithm>` check CMakes supported [hash algorithms](https://cmake.org/cmake/help/latest/command/string.html#hash).
+    - We are bound to the hash algorithms that CMake supports, as we aren't doing anything with the checksums yet. In the future, we may add automatic checksum verification, etc. which would limit us to the algorithms CMake supports.
+  - Multiple checksums can be provided.
+  - Usage:
+    - `sbom_add_package(... CHECKSUM SHA256 "######" ...)`
+    - `sbom_add_package(... CHECKSUM SHA256 "######" SHA1 "######" ...)`
+- `URL`: Package home page.
+  - No SBOM entry when omitted.
+  - See [SPDX clause 7.11](https://spdx.github.io/spdx-spec/v2.3/package-information/#711-package-home-page-field) for more information.
+  - Either `NOASSERTION`, `NONE`, or a `<url>` must follow `URL`.
+- `SOURCE_INFO`: Background information about the origin of the package.
+  - No SBOM entry when omitted.
+  - See [SPDX clause 7.12](https://spdx.github.io/spdx-spec/v2.3/package-information/#712-source-information-field) for more information.
+- `LICENSE`: Concluded license of the package.
+  - When omitted defaults to `NOASSERTION`.
+    - This field is optional in the SPDX specification.
+    - If the field is not present in the SBOM, `NOASSERTION` is implied as per SPDX specification.
+  - See [SPDX clause 7.13](https://spdx.github.io/spdx-spec/v2.3/package-information/#713-concluded-license-field) for more information.
+  - Either `NOASSERTION`, `NONE`, or a valid SPDX license expression must follow `LICENSE`.
+    - See [SPDX License Expressions](https://spdx.github.io/spdx-spec/v2.3/SPDX-license-expressions/) for valid expressions.
+    - The License expression is not verified by this project.
+  - This is the license that the creator of the SBOM concluded the package has, which may differ from the declared license of the package supplier.
+  - Add `DECLARED` to specify the declared license.
+    - When omitted defaults to `NOASSERTION`.
+      - Same reasoning as for the concluded license.
+    - See [SPDX clause 7.15](https://spdx.github.io/spdx-spec/v2.3/package-information/#715-declared-license-field) for more information.
+    - Either `NOASSERTION`, `NONE`, or a valid SPDX license expression must follow `DECLARED`.
+  - Add `COMMENT` to record any additional information that went in to arriving at the concluded license.
+    - No SBOM entry when omitted.
+    - See [SPDX clause 7.16](https://spdx.github.io/spdx-spec/v2.3/package-information/#716-comments-on-license-field) for more information.
+    - SPDX recommends to use this field also when `NOASSERTION` is set.
+  - Usage:
+    - `sbom_add_package(... LICENSE "MIT" DECLARED "MIT" ...)`
+    - `sbom_add_package(... LICENSE "MIT" DECLARED NONE COMMENT "No package level license can be found. The files are licensed individually. All files are MIT licensed." ...)`
+    - `sbom_add_package(... LICENSE NONE ...)`
+- `COPYRIGHT`: Copyright information.
+  - When omitted defaults to `NOASSERTION`.
+    - This field is optional in the SPDX specification.
+    - If the field is not present in the SBOM, `NOASSERTION` is implied as per SPDX specification.
+  - See [SPDX clause 7.17](https://spdx.github.io/spdx-spec/v2.3/package-information/#717-copyright-text-field) for more information.
+  - Either `NOASSERTION`, `NONE`, or a `<copyright_text>` must follow `COPYRIGHT`.
+- `NOTES`:
+  - No SBOM entry when omitted.
+  - `SUMMARY`: A short description of the package.
+    - See [SPDX clause 7.18](https://spdx.github.io/spdx-spec/v2.3/package-information/#718-package-summary-description-field) for more information.
+  - `DESC`: A detailed description of the package.
+    - See [SPDX clause 7.19](https://spdx.github.io/spdx-spec/v2.3/package-information/#719-package-detailed-description-field) for more information.
+  - `COMMENT`: Additional comments about the package.
+    - See [SPDX clause 7.20](https://spdx.github.io/spdx-spec/v2.3/package-information/#720-package-comment-field) for more information.
+  - Usage:
+    - `sbom_generate(... NOTES SUMMARY "A canbus library" DESC "Provides function specified by $someStandard and is certified by ... ." COMMENT "This package came with it's own sbom. Which is appended to this sbom" ...)`
+- `EXTREF`: External references, such as security or package manager information.
+  - No SBOM entry when omitted.
+  - Refer to [SPDX clause 7.21](https://spdx.github.io/spdx-spec/v2.3/package-information/#721-external-reference-field) for details.
+  - Add `COMMENT` to record any additional information about the external reference.
+    - No SBOM entry when omitted.
+    - Refer to [SPDX clause 7.22](https://spdx.github.io/spdx-spec/v2.3/package-information/#722-external-reference-comment-field) for details.
+- `ATTRIBUTION`: Attribution text.
+  - No SBOM entry when omitted.
+  - See [SPDX clause 7.23](https://spdx.github.io/spdx-spec/v2.3/package-information/#723-package-attribution-text-field) for more information.
+  - Multiple strings can be provided and will be added as separate fields to the SBOM.
+  - Usage:
+    - `sbom_add_package(... ATTRIBUTION "text" "text2" ...)`
+- `PURPOSE`:
+  - No SBOM entry when omitted.
+  - See [SPDX clause 7.24](https://spdx.github.io/spdx-spec/v2.3/package-information/#724-primary-package-purpose-field) for more information.
+  - One or many of the following keywords:
+    - `APPLICATION`, `FRAMEWORK`, `LIBRARY`, `CONTAINER`, `OPERATING-SYSTEM`, `DEVICE`, `FIRMWARE`, `SOURCE`, `ARCHIVE`, `FILE`, `INSTALL`, `OTHER`.
+  - Usage:
+    - `sbom_generate(... PURPOSE "APPLICATION" "FIRMWARE" ...)`
+    - `sbom_generate(... PURPOSE "FILE" "SOURCE" "LIBRARY" ...)`
+- `DATE`:
+  - No SBOM entries when omitted.
+  - `RELEASE`: The date the package was released.
+    - See [SPDX clause 7.25](https://spdx.github.io/spdx-spec/v2.3/package-information/#725-release-date) for more information.
+  - `BUILD`: The date the package was built.
+    - See [SPDX clause 7.26](https://spdx.github.io/spdx-spec/v2.3/package-information/#726-built-date) for more information.
+  - `VALID_UNTIL`: End of support date.
+    - See [SPDX clause 7.27](https://spdx.github.io/spdx-spec/v2.3/package-information/#727-valid-until-date) for more information.
+  - `<date>`: A date in the format `YYYY-MM-DDThh:mm:ssZ`.
+  - Usage:
+    - `sbom_add_package(... DATE RELEASE "2024-01-10T00:00:00Z" BUILD "2024-01-07T00:00:00Z" VALID_UNTIL "2029-01-10T00:00:00Z" ...)`
 
 ### `sbom_add_external`
 

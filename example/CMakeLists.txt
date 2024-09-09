@@ -47,7 +47,7 @@ CPMAddPackage( "gh:jarro2783/cxxopts@3.2.0" )
 sbom_add_package(
 	cxxopts
 	VERSION 3.2.0
-	SUPPLIER "Jarryd Beck (https://github.com/jarro2783/cxxopts)"
+	SUPPLIER PERSON "Jarryd Beck"
 	LICENSE MIT
 )
 
@@ -61,7 +61,7 @@ CPMAddPackage(
 sbom_add_package(
 	Boost
 	VERSION "1.85.0"
-	SUPPLIER "https://www.boost.org"
+	SUPPLIER ORGANIZATION "Boost Foundation"
 	LICENSE BSL-1.0
 )
 
