@@ -33,7 +33,10 @@ Major Changes include:
 **Contents**
 
 - [How to use](#how-to-use)
-- [SBOM generation](#sbom-generation)
+	- [Example](#example)
+	- [Adding SBOM-Builder to your project](#adding-sbom-builder-to-your-project)
+	- [Build and install your project](#build-and-install-your-project)
+- [SBOM Generation](#sbom-generation)
 	- [`sbom_generate`](#sbom_generate)
 	- [`sbom_add_file`](#sbom_add_file)
 		- [`sbom_add_directory`](#sbom_add_directory)
@@ -53,121 +56,119 @@ Major Changes include:
 
 ## How to use
 
-To use this CMake module, perform the following steps:
+A SBOM is generated for one project, and describes the output of that project as a **single** package, which may contain files and other package dependencies.
+All files shall be installed under `CMAKE_INSTALL_PREFIX`. The package dependencies are all black boxes; their files are not specified or analysed.
 
-1. Put `sbom.cmake` somewhere in your project.
-
-	There are a variety of way's to do this. We recommend to use CMake directly to keep things simple.
-
-	To download a specifc version:
-
-	```cmake
-	file(
-		DOWNLOAD
-		https://github.com/sodgeit/CMake-SBOM-Builder/releases/download/v0.2.1/sbom.cmake
-		${CMAKE_SOURCE_DIR}/cmake/sbom.cmake
-		EXPECTED_HASH SHA256=7b354f3a5976c4626c876850c93944e52c83ec59a159ae5de5be7983f0e17a2a
-	)
-	```
-
-	Or always download the latest release:
-
-	```cmake
-	file(
-		DOWNLOAD
-		https://github.com/sodgeit/CMake-SBOM-Builder/releases/latest/download/sbom.cmake
-		${CMAKE_SOURCE_DIR}/cmake/sbom.cmake
-		EXPECTED_HASH SHA256=7b354f3a5976c4626c876850c93944e52c83ec59a159ae5de5be7983f0e17a2a
-	)
-	```
-
-	Although the later example always fetches the newest version when it's released,
-	the CMake configure stage will fail due to the `EXPECTED_HASH` being different.
-
-2. include `sbom.cmake`:
-
-	```cmake
-	include(cmake/sbom.cmake)
-	```
-
-3. Somewhere ***after*** `project(...)`, prepare the SBOM:
-
-	```cmake
-	sbom_generate(
-		SUPPLIER ORGANIZATION "sodgeIT" EMAIL "kontakt@sodgeit.de"
-		PACKAGE_URL "https://github.com/sodgeit/CMake-SBOM-Builder"
-		PACKAGE_LICENSE "MIT"
-	)
-
-	# Add sbom_add_*() ...
-	sbom_add_package(<library>)
-	sbom_add_file(<file>)
-
-	sbom_finalize()
-	```
-
-4. Build ***and install*** your project:
-
-	Using single config generators (Makefiles, Ninja):
-
-	```bash
-	cmake -S . -B build -DCMAKE_INSTALL_PREFIX=build/install -DCMAKE_BUILD_TYPE={Debug,Release,...}
-	cmake --build build --target all
-	cmake --install build
-	```
-
-	Using multi config generators (Visual Studio, Ninja Multi-Config):
-
-	```bash
-	cmake -S . -B build -G "Ninja Multi-Config" -DCMAKE_INSTALL_PREFIX=build/install
-	cmake --build build --target all --config {Debug,Release,...} #--target ALL_BUILD for Visual Studio
-	cmake --install build --config {Debug,Release,...}
-	```
-
-	We recommend using the `--prefix` option to override the install prefix, when using multi-config generators. This allows the SBOM to be generated in different locations for each configuration.
-	If you don't use the `--prefix` option, the SBOM will be generated in the same location for all configurations, overwriting each other.
-
-	```bash
-	cmake -S . -B build -G "Ninja Multi-Config"
-	cmake --build build --target all --config {Debug,Release,...}
-	cmake --install build --config {Debug,Release,...} --prefix build/install/{Debug,Release,...}
-	```
-
-	Per default the SBOM will be generated in `${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}-sbom-${GIT_VERSION_PATH}.spdx` (see also CMake output).
-
-	```text
-		-- Installing: .../build/install/share/example-sbom-example-0.2.1.spdx
-		...
-		-- Finalizing: .../build/install/share/example-sbom-example-0.2.1.spdx
-	```
-
----
-
-## SBOM generation
-
-The concept is that an SBOM is generated for one project, and describes the output of that project as a single package, which contains files, and other package dependencies. The files are all installed under `CMAKE_INSTALL_PREFIX`. The package dependencies are all black boxes; their files are not specified.
-
-Generally, the following sequence is executed to create the SBOM:
+### Example
 
 ```cmake
-# Start SBOM generation. Optionally, provide template files, licence, copyright.
+cmake_minimum_required(VERSION 3.16)
+project(Example)
+
+include(cmake/sbom.cmake)
+
 sbom_generate(
-	SUPPLIER ORGANIZATION "sodgeIT" EMAIL "kontakt@sodgeit.de"
-	PACKAGE_URL "https://github.com/sodgeit/CMake-SBOM-Builder"
+	SUPPLIER ORGANIZATION "sodgeIT"
 	PACKAGE_LICENSE "MIT"
 )
 
-# Call for every artifact that should be recorded/that is part of the distributed package.
-sbom_add_target(some_target)
-sbom_add_file(some_filename ...)
-sbom_add_directory(all_files_from_some_directory ...)
+sbom_add_package(Boost
+	VERSION 1.88
+	SUPPLIER ORGANIZATION "Boost Foundation"
+	LICENSE "BSL-1.0"
+)
+sbom_add_package(cxxopts
+	VERSION 3.2.0
+	SUPPLIER PERSON "Jarryd Beck"
+	LICENSE "MIT"
+)
 
-# To indicate dependencies on other packages/libraries/etc.:
-sbom_add_package(some_dependency ...)
+add_library(example_lib SHARED)
+target_sources(example_lib PRIVATE
+	source1.c
+	source2.cpp
+	header1.h
+)
+target_link_libraries(example_lib PUBLIC Boost::algorithm)
 
-# Finally:
+add_executable(cli main.cpp)
+target_link_libraries(cli PRIVATE example_lib cxxopts)
+
+install(TARGETS cli	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS example_lib LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILE header1.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+sbom_add_target(cli)
+sbom_add_target(example_lib)
+sbom_add_file(${CMAKE_INSTALL_INCLUDEDIR}/header1.h LICENSE "MIT")
+
 sbom_finalize()
 ```
+
+### Adding SBOM-Builder to your project
+
+There are a variety of way's to do this. We recommend to use CMake directly to keep things simple.
+
+To download a specific version:
+
+```cmake
+file(
+	DOWNLOAD
+	https://github.com/sodgeit/CMake-SBOM-Builder/releases/download/v0.2.1/sbom.cmake
+	${CMAKE_SOURCE_DIR}/cmake/sbom.cmake
+	EXPECTED_HASH SHA256=7b354f3a5976c4626c876850c93944e52c83ec59a159ae5de5be7983f0e17a2a
+)
+```
+
+Or always download the latest release:
+
+```cmake
+file(
+	DOWNLOAD
+	https://github.com/sodgeit/CMake-SBOM-Builder/releases/latest/download/sbom.cmake
+	${CMAKE_SOURCE_DIR}/cmake/sbom.cmake
+	EXPECTED_HASH SHA256=7b354f3a5976c4626c876850c93944e52c83ec59a159ae5de5be7983f0e17a2a
+)
+```
+
+And then just include the file:
+
+```cmake
+include(cmake/sbom.cmake)
+```
+
+### Build and install your project
+
+Using single config generators (Makefiles, Ninja):
+
+```bash
+cmake -S . -B build -DCMAKE_INSTALL_PREFIX=build/install -DCMAKE_BUILD_TYPE={Debug,Release,...}
+cmake --build build --target all
+cmake --install build
+```
+
+Using multi config generators (Visual Studio, Ninja Multi-Config):
+
+```bash
+cmake -S . -B build -G "Ninja Multi-Config"
+cmake --build build --target all --config {Debug,Release,...} #--target ALL_BUILD for Visual Studio
+cmake --install build --config {Debug,Release,...} --prefix build/install/{Debug,Release,...}
+```
+
+We recommend using the `--prefix` option to override the install prefix, when using multi-config generators. This allows the SBOM to be generated in different locations for each configuration.
+If you don't use the `--prefix` option, the SBOM will be generated in the same location for all configurations, overwriting each other.
+
+Per default the SBOM will be generated in `${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}-sbom-${GIT_VERSION_PATH}.spdx` (see also CMake output).
+
+```text
+-- Installing: .../build/install/share/example-sbom-0.2.1.spdx
+...
+-- Finalizing: .../build/install/share/example-sbom-0.2.1.spdx
+```
+
+---
+
+## SBOM Generation
 
 `cmake/sbom.cmake` provides the following functions:
 
