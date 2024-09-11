@@ -178,10 +178,9 @@ Generates the SBOM creator information and the package information of the packag
 
 ```cmake
 sbom_generate(
-   [INPUT <filename>...]
+   CREATOR <PERSON|ORGANIZATION> <name> [EMAIL <email>]
    [OUTPUT <filename>]
    [NAMESPACE <URI>]
-   [CREATOR <PERSON|ORGANIZATION> <name> [EMAIL <email>]]
    [PACKAGE_NAME <package_name>]
    [PACKAGE_VERSION <version_string>]
    [PACKAGE_FILENAME <filename>]
@@ -198,23 +197,7 @@ sbom_generate(
 )
 ```
 
-- `INPUT`: One or more file names, which are concatenated into the SBOM output file.
-  - ***Restrictions:***
-    - Absolute paths only.
-  - Variables and generator expressions are supported in these files.
-  - Variables in the form `@var@` are replaced during config, `${var}` during install.
-  - When omitted, a standard document/package SBOM is generated.
-  - The other parameters can be referenced in the input files, prefixed with `SBOM_GENERATE_`.
-- `OUTPUT`: Output filename.
-  - Can be absolute or relative to `CMAKE_INSTALL_PREFIX`.
-  - Default location is `${CMAKE_INSTALL_PREFIX}/share/${PACKAGE_NAME}-sbom-${GIT_VERSION_PATH}.spdx`.
-  - `--prefix` option is honoured when added to the install command.
-  - `--prefix` and `${CMAKE_INSTALL_PREFIX}` have no effect when `OUTPUT` is an absolute path.
-- `NAMESPACE`: Document namespace.
-  - may be omitted when any `INPUT` is given.
-  - If not specified, default to a URL based on `PACKAGE_URL`, `PACKAGE_NAME` and `PACKAGE_VERSION`.
 - `CREATOR`: Supplier of the Package and Creator of the sbom
-  - May be omitted when any `INPUT` is given.
   - See [SPDX clause 6.8](https://spdx.github.io/spdx-spec/v2.3/document-creation-information/#68-creator-field) & [SPDX clause 7.5](https://spdx.github.io/spdx-spec/v2.3/package-information/#75-package-supplier-field) for more information.
   - One of the `<PERSON|ORGANIZATION>` keywords must be provided.
   - `EMAIL` is optional.
@@ -224,6 +207,13 @@ sbom_generate(
   - ***Note:***
     - The SPDX specification differentiates between the creator of the SBOM and the supplier of the package it describes. However, this project treats them as the same entity. This is based on the assumption that whoever uses this project, uses it to generate a SBOM for a package they are building. In this case, the creator of the SBOM and the supplier of the package are the same entity.
     - The SBOM-Builder is always added as an additional creator of the SBOM.
+- `OUTPUT`: Output filename.
+  - Can be absolute or relative to `CMAKE_INSTALL_PREFIX`.
+  - Default location is `${CMAKE_INSTALL_PREFIX}/share/${PACKAGE_NAME}-sbom-${GIT_VERSION_PATH}.spdx`.
+  - `--prefix` option is honoured when added to the install command.
+  - `--prefix` and `${CMAKE_INSTALL_PREFIX}` have no effect when `OUTPUT` is an absolute path.
+- `NAMESPACE`: Document namespace.
+  - If not specified, default to a URL based on `PACKAGE_URL`, `PACKAGE_NAME` and `PACKAGE_VERSION`.
 - `PACKAGE_NAME`: Package name.
   - Defaults to `${PROJECT_NAME}`.
   - See [SPDX clause 7.1](https://spdx.github.io/spdx-spec/v2.3/package-information/#71-package-name-field) for more information.
@@ -238,7 +228,6 @@ sbom_generate(
   - Defaults to `NOASSERTION`.
   - See [SPDX clause 7.7](https://spdx.github.io/spdx-spec/v2.3/package-information/#77-package-download-location-field) for more information.
 - `PACKAGE_URL`: Package home page.
-  - may be omitted when any `INPUT` is given.
   - `NONE` or `NOASSERTION` require that `NAMESPACE` is provided.
   - otherwise `<url>` is required.
   - See [SPDX clause 7.11](https://spdx.github.io/spdx-spec/v2.3/package-information/#711-package-home-page-field) for more information.

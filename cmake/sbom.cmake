@@ -563,7 +563,7 @@ function(sbom_generate)
 		PACKAGE_COPYRIGHT
 		ENABLE_CHECKS
 	)
-	set(multiValueArgs INPUT CREATOR PACKAGE_NOTES PACKAGE_PURPOSE)
+	set(multiValueArgs CREATOR PACKAGE_NOTES PACKAGE_PURPOSE)
 	cmake_parse_arguments(
 		SBOM_GENERATE "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
 	)
@@ -576,33 +576,31 @@ function(sbom_generate)
 		set(SBOM_GENERATE_PACKAGE_NAME ${PROJECT_NAME})
 	endif()
 
-	if(NOT DEFINED SBOM_GENERATE_INPUT)
-		if(NOT DEFINED SBOM_GENERATE_CREATOR)
-			message(FATAL_ERROR "Specify a CREATOR or pass INPUT files")
-		endif()
+	if(NOT DEFINED SBOM_GENERATE_CREATOR)
+		message(FATAL_ERROR "Missing required argument CREATOR.")
+	endif()
 
-		cmake_parse_arguments(SBOM_GENERATE_CREATOR "" "PERSON;ORGANIZATION;EMAIL" "" ${SBOM_GENERATE_CREATOR})
-		if(SBOM_GENERATE_CREATOR_UNPARSED_ARGUMENTS)
-			message(FATAL_ERROR "Unknown subarguments: ${SBOM_GENERATE_CREATOR_UNPARSED_ARGUMENTS} for CREATOR.")
-		endif()
-		if((NOT DEFINED SBOM_GENERATE_CREATOR_PERSON) AND (NOT DEFINED SBOM_GENERATE_CREATOR_ORGANIZATION))
-			message(FATAL_ERROR "Missing <PERSON|ORGANIZATION> <name> for argument CREATOR.")
-		elseif(DEFINED SBOM_GENERATE_CREATOR_PERSON AND DEFINED SBOM_GENERATE_CREATOR_ORGANIZATION)
-			message(FATAL_ERROR "Specify either PERSON or ORGANIZATION, not both.")
-		endif()
+	cmake_parse_arguments(SBOM_GENERATE_CREATOR "" "PERSON;ORGANIZATION;EMAIL" "" ${SBOM_GENERATE_CREATOR})
+	if(SBOM_GENERATE_CREATOR_UNPARSED_ARGUMENTS)
+		message(FATAL_ERROR "Unknown subarguments: ${SBOM_GENERATE_CREATOR_UNPARSED_ARGUMENTS} for CREATOR.")
+	endif()
+	if((NOT DEFINED SBOM_GENERATE_CREATOR_PERSON) AND (NOT DEFINED SBOM_GENERATE_CREATOR_ORGANIZATION))
+		message(FATAL_ERROR "Missing <PERSON|ORGANIZATION> <name> for argument CREATOR.")
+	elseif(DEFINED SBOM_GENERATE_CREATOR_PERSON AND DEFINED SBOM_GENERATE_CREATOR_ORGANIZATION)
+		message(FATAL_ERROR "Specify either PERSON or ORGANIZATION, not both.")
+	endif()
 
-		if(NOT DEFINED SBOM_GENERATE_PACKAGE_URL)
-			if(NOT DEFINED SBOM_GENERATE_NAMESPACE)
-				message(FATAL_ERROR "Specify NAMESPACE when PACKAGE_URL is omitted.")
-			endif()
-		endif()
-
+	if(NOT DEFINED SBOM_GENERATE_PACKAGE_URL)
 		if(NOT DEFINED SBOM_GENERATE_NAMESPACE)
-			if((NOT DEFINED SBOM_GENERATE_PACKAGE_URL) OR (SBOM_GENERATE_PACKAGE_URL STREQUAL "NONE") OR (SBOM_GENERATE_PACKAGE_URL STREQUAL "NOASSERTION"))
-				message(FATAL_ERROR "Specifiy PACKAGE_URL <url> when NAMESPACE is omitted.")
-			endif()
-			set(SBOM_GENERATE_NAMESPACE "${SBOM_GENERATE_PACKAGE_URL}/spdxdocs/${SBOM_GENERATE_PACKAGE_NAME}-${SBOM_GENERATE_PACKAGE_VERSION}")
+			message(FATAL_ERROR "Specify NAMESPACE when PACKAGE_URL is omitted.")
 		endif()
+	endif()
+
+	if(NOT DEFINED SBOM_GENERATE_NAMESPACE)
+		if((NOT DEFINED SBOM_GENERATE_PACKAGE_URL) OR (SBOM_GENERATE_PACKAGE_URL STREQUAL "NONE") OR (SBOM_GENERATE_PACKAGE_URL STREQUAL "NOASSERTION"))
+			message(FATAL_ERROR "Specifiy PACKAGE_URL <url> when NAMESPACE is omitted.")
+		endif()
+		set(SBOM_GENERATE_NAMESPACE "${SBOM_GENERATE_PACKAGE_URL}/spdxdocs/${SBOM_GENERATE_PACKAGE_NAME}-${SBOM_GENERATE_PACKAGE_VERSION}")
 	endif()
 
 	if(NOT DEFINED GIT_VERSION)
@@ -709,36 +707,13 @@ function(sbom_generate)
 	set(_sbom_intermediate_file "$<CONFIG>/sbom.spdx.in")
 	set(_sbom_document_template "SPDXRef-DOCUMENT.spdx.in")
 	set(_sbom_export_path "${SBOM_GENERATE_OUTPUT}")
-	set(_sbom_provided_input false)
 
 	if(NOT IS_ABSOLUTE "${SBOM_GENERATE_OUTPUT}")
 		set(_sbom_export_path "\${CMAKE_INSTALL_PREFIX}/${SBOM_GENERATE_OUTPUT}")
 	endif()
 
-	if(NOT DEFINED SBOM_GENERATE_INPUT)
-		_sbom_generate_document_template()
-		set(SBOM_LAST_SPDXID "SPDXRef-${SBOM_GENERATE_PACKAGE_NAME}" PARENT_SCOPE)
-	else()
-		set(_sbom_provided_input true)
-		set(_sbom_provided_input_files "")
-		foreach(_f IN LISTS SBOM_GENERATE_INPUT)
-			if( NOT IS_ABSOLUTE "${_f}" )
-				message(FATAL_ERROR "Input file must be an absolute path: ${_f}")
-			endif()
-			get_filename_component(_f_name "${_f}" NAME) #REFAC(>=3.20): Use cmake_path() instead of get_filename_component().
-			set(_f_in "${SBOM_BINARY_DIR}/${_f_name}")
-			set(_f_in_gen "${_f_in}_gen")
-			configure_file("${_f}" "${_f_in}" @ONLY)
-			file(
-				GENERATE
-				OUTPUT "${_f_in_gen}"
-				INPUT "${_f_in}"
-			)
-			list(APPEND _sbom_provided_input_files "${_f_in_gen}")
-		endforeach()
-
-		set(SBOM_LAST_SPDXID "" PARENT_SCOPE)
-	endif()
+	_sbom_generate_document_template()
+	set(SBOM_LAST_SPDXID "SPDXRef-${SBOM_GENERATE_PACKAGE_NAME}" PARENT_SCOPE)
 
 	_sbom_append_sbom_snippet("setup.cmake")
 	file(GENERATE
@@ -755,18 +730,8 @@ message(STATUS \"Installing: \${SBOM_EXPORT_FILENAME}\")
 set(SBOM_INTERMEDIATE_FILE \"\${SBOM_BINARY_DIR}/sbom-build/${_sbom_intermediate_file}\")
 file(WRITE \${SBOM_INTERMEDIATE_FILE} \"\")
 
-set(SBOM_PROVIDED_INPUT_FILES \"${_sbom_provided_input_files}\")
-set(SBOM_PROVIDED_INPUT ${_sbom_provided_input})
-
-if(NOT SBOM_PROVIDED_INPUT)
-	file(READ \"\${SBOM_SNIPPET_DIR}/\${SBOM_DOCUMENT_TEMPLATE}\" _f_contents)
-	file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"\${_f_contents}\")
-else()
-	foreach(_f IN LISTS SBOM_PROVIDED_INPUT_FILES)
-		file(READ \"\${_f}\" _f_contents)
-		file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"\${_f_contents}\")
-	endforeach()
-endif()
+file(READ \"\${SBOM_SNIPPET_DIR}/\${SBOM_DOCUMENT_TEMPLATE}\" _f_contents)
+file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"\${_f_contents}\")
 
 set(SBOM_VERIFICATION_CODES \"\")
 "
