@@ -7,13 +7,12 @@
 include(sbom)
 
 sbom_generate(
+	PACKAGE_NAME "test-full_doc"
 	OUTPUT "./full-sbom.spdx"
-	COPYRIGHT "2023 me"
-	LICENSE "CC0-1.0"
+	PACKAGE_COPYRIGHT "2023 me"
 	NAMESPACE "https://test.com/spdxdoc/me"
-	PROJECT "test-full_doc"
-	SUPPLIER FullDocTest
-	SUPPLIER_URL https://www.fullDocTest.com
+	CREATOR ORGANIZATION FullDocTest
+	PACKAGE_URL https://www.fullDocTest.com
 )
 
 sbom_finalize()

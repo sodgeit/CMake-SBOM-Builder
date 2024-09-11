@@ -6,15 +6,15 @@
 
 include(sbom)
 
-sbom_generate(SUPPLIER package_test SUPPLIER_URL https://www.package_test.com)
+sbom_generate(CREATOR PERSON package_test PACKAGE_URL https://www.package_test.com)
 
 sbom_add_package(foo)
-sbom_add_package(foo DOWNLOAD_LOCATION http://foo.bar/baz)
+sbom_add_package(foo DOWNLOAD http://foo.bar/baz)
 sbom_add_package(
 	bar
-	DOWNLOAD_LOCATION http://somwhere.com/bar
+	DOWNLOAD http://somwhere.com/bar
 	LICENSE CC0-1.0
-	SUPPLIER "Person: me"
+	SUPPLIER PERSON "me"
 	VERSION 0.1
 )
 

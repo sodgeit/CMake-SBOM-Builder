@@ -5,15 +5,13 @@
 @TEST_PREAMBLE@
 
 include(sbom)
-set(SBOM_SUPPLIER ExternalTest)
-set(SBOM_SUPPLIER_URL https://www.externalTest.com)
 
 make_directory(${CMAKE_CURRENT_BINARY_DIR}/other)
 file(
 	WRITE ${CMAKE_CURRENT_BINARY_DIR}/other/CMakeLists.txt
 	"
 	project(other)
-	sbom_generate(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/other-sbom.spdx)
+	sbom_generate(CREATOR PERSON \"Other\" OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/other-sbom.spdx PACKAGE_URL https://www.externalTest.com)
 	sbom_finalize()
 	"
 )
@@ -23,7 +21,7 @@ add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/other ${CMAKE_CURRENT_BINARY_DIR}/o
 # this is just used for testing purposes. Do not rely on this in production code.
 get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
 
-sbom_generate()
+sbom_generate(CREATOR PERSON ExternalTest PACKAGE_URL https://www.externalTest.com)
 sbom_add_external(SPDXRef-other "${_sbom}")
 
 sbom_add_external(SPDXRef-other "${_sbom}"

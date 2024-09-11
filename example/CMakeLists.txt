@@ -34,9 +34,12 @@ include(../cmake/sbom.cmake)
 # This is the only required call to generate the SBOM. It has to be called before any other
 # sbom_add_* function.
 sbom_generate(
-	LICENSE CC0-1.0
-	SUPPLIER ${PROJECT_NAME}
-	SUPPLIER_URL ${PROJECT_HOMEPAGE_URL}
+	CREATOR ORGANIZATION "Example Org" EMAIL "example@org.com"
+	PACKAGE_URL ${PROJECT_HOMEPAGE_URL}
+	PACKAGE_DOWNLOAD "http://example.org/download"
+	PACKAGE_LICENSE "MIT"
+	PACKAGE_NOTES SUMMARY "Just a simple example project, to demonstrate the SBOM-Builder"
+	PACKAGE_PURPOSE "APPLICATION" "OTHER"
 )
 
 # mention the dependencies used in the SBOM
@@ -44,7 +47,7 @@ CPMAddPackage( "gh:jarro2783/cxxopts@3.2.0" )
 sbom_add_package(
 	cxxopts
 	VERSION 3.2.0
-	SUPPLIER "Jarryd Beck (https://github.com/jarro2783/cxxopts)"
+	SUPPLIER PERSON "Jarryd Beck"
 	LICENSE MIT
 )
 
@@ -58,7 +61,7 @@ CPMAddPackage(
 sbom_add_package(
 	Boost
 	VERSION "1.85.0"
-	SUPPLIER "https://www.boost.org"
+	SUPPLIER ORGANIZATION "Boost Foundation"
 	LICENSE BSL-1.0
 )
 

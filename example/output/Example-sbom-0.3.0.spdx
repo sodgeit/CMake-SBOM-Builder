@@ -1,10 +1,10 @@
 SPDXVersion: SPDX-2.3
 DataLicense: CC0-1.0
 SPDXID: SPDXRef-DOCUMENT
-DocumentName: Example-sbom-v0.3.0-13-gd5b28ae+comprehensive-example+dirty.spdx
-DocumentNamespace: https://github.com/sodgeit/CMake-SBOM-Builder/spdxdocs/Example-v0.3.0-13-gd5b28ae+comprehensive-example+dirty
-Creator: Organization: Example
-Creator: Tool: CMake-SBOM-Builder-0.0.0-development-version
+DocumentName: Example-sbom-v0.3.0
+DocumentNamespace: https://github.com/sodgeit/CMake-SBOM-Builder/spdxdocs/Example-v0.3.0
+Creator: Organization: Example Org (example@org.com)
+Creator: Tool: CMake-SBOM-Builder-v0.3.0
 CreatorComment: <text>This SPDX document was created from CMake 3.30.1, using CMake-SBOM-Builder from https://github.com/sodgeit/CMake-SBOM-Builder</text>
 Created: 2024-08-29T09:16:55Z
 
@@ -26,14 +26,16 @@ RelationshipComment: <text>SPDXRef-Example is built by compiler Clang (C:/Progra
 PackageName: Example
 SPDXID: SPDXRef-Example
 ExternalRef: SECURITY cpe23Type cpe:2.3:o:microsoft:windows_10:-:*:*:*:*:*:x64:*
-ExternalRef: PACKAGE-MANAGER purl pkg:supplier/Example/Example@v0.3.0-13-gd5b28ae+comprehensive-example+dirty
-PackageVersion: v0.3.0-13-gd5b28ae+comprehensive-example+dirty
-PackageSupplier: Organization: Example
-PackageDownloadLocation: NOASSERTION
-PackageLicenseConcluded: CC0-1.0
-PackageLicenseDeclared: CC0-1.0
-PackageCopyrightText: 2024;Example
+ExternalRef: PACKAGE-MANAGER purl pkg:supplier/Example/Example@v0.3.0
+PackageVersion: v0.3.0
+PackageFileName: Example-v0.3.0.zip
+PackageSupplier: Organization: Example Org (example@org.com)
+PackageDownloadLocation: http://example.org/download
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: 2024 Example Org
 PackageHomePage: https://github.com/sodgeit/CMake-SBOM-Builder
+PackageSummary: <text>Just a simple example project, to demonstrate the SBOM-Builder</text>
 PackageComment: <text>Built by CMake 3.30.1 with Release configuration for Windows (AMD64)</text>
 PackageVerificationCode: eab840722ebab9379e046b88ce0e6f6f616a2eb6
 BuiltDate: 2024-08-29T09:16:55Z
