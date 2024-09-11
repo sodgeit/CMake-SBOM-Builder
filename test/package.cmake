@@ -6,7 +6,7 @@
 
 include(sbom)
 
-sbom_generate(SUPPLIER PERSON package_test PACKAGE_URL https://www.package_test.com)
+sbom_generate(CREATOR PERSON package_test PACKAGE_URL https://www.package_test.com)
 
 sbom_add_package(foo)
 sbom_add_package(foo DOWNLOAD http://foo.bar/baz)

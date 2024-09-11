@@ -174,14 +174,14 @@ Per default the SBOM will be generated in `${CMAKE_INSTALL_PREFIX}/share/${PROJE
 
 ### `sbom_generate`
 
-Generates the SBOM creator information, as well as the information of the package that the SBOM describes. (see spdx clause 6 & 7)
+Generates the SBOM creator information and the package information of the package that the SBOM describes.
 
 ```cmake
 sbom_generate(
    [INPUT <filename>...]
    [OUTPUT <filename>]
    [NAMESPACE <URI>]
-   [SUPPLIER <NOASSERTION|PERSON|ORGANIZATION> <name> [EMAIL <email>]]
+   [CREATOR <PERSON|ORGANIZATION> <name> [EMAIL <email>]]
    [PACKAGE_NAME <package_name>]
    [PACKAGE_VERSION <version_string>]
    [PACKAGE_FILENAME <filename>]
@@ -207,98 +207,69 @@ sbom_generate(
   - The other parameters can be referenced in the input files, prefixed with `SBOM_GENERATE_`.
 - `OUTPUT`: Output filename.
   - Can be absolute or relative to `CMAKE_INSTALL_PREFIX`.
-  - Default location is `${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}-sbom-${GIT_VERSION_PATH}.spdx`.
+  - Default location is `${CMAKE_INSTALL_PREFIX}/share/${PACKAGE_NAME}-sbom-${GIT_VERSION_PATH}.spdx`.
   - `--prefix` option is honoured when added to the install command.
   - `--prefix` and `${CMAKE_INSTALL_PREFIX}` have no effect when `OUTPUT` is an absolute path.
 - `NAMESPACE`: Document namespace.
   - may be omitted when any `INPUT` is given.
-  - If not specified, default to a URL based on `PACKAGE_URL`, `PROJECT_NAME` and `GIT_VERSION`.
-- `SUPPLIER`: Supplier of the Package and Creator of the sbom (spdx clause 6.8 & clause 7.5)
+  - If not specified, default to a URL based on `PACKAGE_URL`, `PACKAGE_NAME` and `PACKAGE_VERSION`.
+- `CREATOR`: Supplier of the Package and Creator of the sbom
   - May be omitted when any `INPUT` is given.
-  - Adds both the `Creator` and `PackageSupplier` fields to the SBOM.
-  - One of the `<NOASSERTION|PERSON|ORGANIZATION>` keywords must be provided.
-    - For `NOASSERTION`: `<name>` and `EMAIL` are not used.
-  - `<name>` is either a person or organization name.
+  - See [SPDX clause 6.8](https://spdx.github.io/spdx-spec/v2.3/document-creation-information/#68-creator-field) & [SPDX clause 7.5](https://spdx.github.io/spdx-spec/v2.3/package-information/#75-package-supplier-field) for more information.
+  - One of the `<PERSON|ORGANIZATION>` keywords must be provided.
   - `EMAIL` is optional.
   - Usage:
-    - `sbom_generate(... SUPPLIER ORGANIZATION "My Company" EMAIL "contact@company.com" ...)`
-    - `sbom_generate(... SUPPLIER PERSON "Firstname Lastname" ...)`
-    - `sbom_generate(... SUPPLIER NOASSERTION ...)`
-- `PACKAGE_NAME`: Package name. (spdx clause 7.1)
-  - Defaults to `PROJECT_NAME`.
-- `PACKAGE_VERSION`: Package version field (spdx clause 7.3)
+    - `sbom_generate(... CREATOR ORGANIZATION "My Company" EMAIL "contact@company.com" ...)`
+    - `sbom_generate(... CREATOR PERSON "Firstname Lastname" ...)`
+  - ***Note:***
+    - The SPDX specification differentiates between the creator of the SBOM and the supplier of the package it describes. However, this project treats them as the same entity. This is based on the assumption that whoever uses this project, uses it to generate a SBOM for a package they are building. In this case, the creator of the SBOM and the supplier of the package are the same entity.
+    - The SBOM-Builder is always added as an additional creator of the SBOM.
+- `PACKAGE_NAME`: Package name.
+  - Defaults to `${PROJECT_NAME}`.
+  - See [SPDX clause 7.1](https://spdx.github.io/spdx-spec/v2.3/package-information/#71-package-name-field) for more information.
+- `PACKAGE_VERSION`: Package version field
   - Defaults to `${GIT_VERSION}`. (see [Version Extraction](#version-extraction))
-- `PACKAGE_FILENAME`: Filename of the distributed package. (spdx clause 7.4)
+  - See [SPDX clause 7.3](https://spdx.github.io/spdx-spec/v2.3/package-information/#73-package-version-field) for more information.
+- `PACKAGE_FILENAME`: Filename of the distributed package.
   - Defaults to `${PACKAGE_NAME}-${PACKAGE_VERSION}.zip`.
-- `PACKAGE_DOWNLOAD`: Download location of the distributed package. (spdx clause 7.7)
+  - See [SPDX clause 7.4](https://spdx.github.io/spdx-spec/v2.3/package-information/#74-package-file-name-field) for more information.
+- `PACKAGE_DOWNLOAD`: Download location of the distributed package.
   - Either `NOASSERTION`, `NONE`, or a `<url>`.
-  - If omitted, defaults to `NOASSERTION`.
-- `PACKAGE_URL`: Package home page. (spdx clause 7.11)
+  - Defaults to `NOASSERTION`.
+  - See [SPDX clause 7.7](https://spdx.github.io/spdx-spec/v2.3/package-information/#77-package-download-location-field) for more information.
+- `PACKAGE_URL`: Package home page.
   - may be omitted when any `INPUT` is given.
   - `NONE` or `NOASSERTION` require that `NAMESPACE` is provided.
   - otherwise `<url>` is required.
-- `PACKAGE_LICENSE`: License of the package described in the SBOM. (spdx clause 7.15 & 7.13)
+  - See [SPDX clause 7.11](https://spdx.github.io/spdx-spec/v2.3/package-information/#711-package-home-page-field) for more information.
+- `PACKAGE_LICENSE`: License of the package described in the SBOM.
   - Requires one of `NOASSERTION`, `NONE`, or a valid SPDX license expression.
   - If omitted, defaults to `NOASSERTION`.
-  - Adds both the `PackageLicenseDeclared` and `PackageLicenseConcluded` fields to the SBOM.
-    - Differentiating between declared and concluded licenses, does not make sense when the creator of the SBOM also supplies the package.
-- `PACKAGE_COPYRIGHT`: Copyright information. (spdx clause 7.17)
+  - See [SPDX clause 7.13](https://spdx.github.io/spdx-spec/v2.3/package-information/#713-concluded-license-field) & [SPDX clause 7.15](https://spdx.github.io/spdx-spec/v2.3/package-information/#715-declared-license-field) for more information.
+  - ***Note:***
+    - The SPDX specification differentiates between a declared and a concluded license. This argument sets both to the same value.
+    - Assuming that the creator of the SBOM is the supplier of the package, there should be no difference between the declared and concluded license.
+- `PACKAGE_COPYRIGHT`: Copyright information.
   - Either `NOASSERTION`, `NONE`, or a `<copyright_text>`.
-  - If omitted, generates as `<year> <name>` where `<name>` is the `SUPPLIER` name.
-    - If `NOASSERTION` was set for `SUPPLIER`, the `PACKAGE_COPYRIGHT` defaults to `NOASSERTION`.
-- `PACKAGE_NOTES`: (spdx clause 7.18, 7.19)
-  - Optional. If omitted, no `PackageSummary` and `PackageDescription` fields are added to the SBOM.
+  - Defaults to `<year> <name>` where `<name>` is the `CREATOR` name.
+  - See [SPDX clause 7.17](https://spdx.github.io/spdx-spec/v2.3/package-information/#717-copyright-text-field) for more information.
+- `PACKAGE_NOTES`:
+  - No SBOM entry when omitted.
   - `SUMMARY`: A short description of the package.
   - `DESC`: A detailed description of the package.
   - Usage:
     - `sbom_generate(... PACKAGE_NOTES SUMMARY "A short description" DESC "A detailed description" ...)`
     - `sbom_generate(... PACKAGE_NOTES SUMMARY "A short description" ...)`
     - `sbom_generate(... PACKAGE_NOTES DESC "A detailed description" ...)`
-- `PACKAGE_PURPOSE`: (spdx clause 7.24)
+  - See [SPDX clause 7.18](https://spdx.github.io/spdx-spec/v2.3/package-information/#718-package-summary-description-field) & [SPDX clause 7.19](https://spdx.github.io/spdx-spec/v2.3/package-information/#719-package-detailed-description-field) for more information.
+- `PACKAGE_PURPOSE`:
   - Optional. If omitted, no `PrimaryPackagePurpose` field is added to the SBOM.
   - One or many of the following keywords:
     - `APPLICATION`, `FRAMEWORK`, `LIBRARY`, `CONTAINER`, `OPERATING-SYSTEM`, `DEVICE`, `FIRMWARE`, `SOURCE`, `ARCHIVE`, `FILE`, `INSTALL`, `OTHER`.
   - Usage:
     - `sbom_generate(... PACKAGE_PURPOSE "APPLICATION" "FIRMWARE" ...)`
     - `sbom_generate(... PACKAGE_PURPOSE "FILE" "SOURCE" "LIBRARY" ...)`
-
-***Unsupported spdx fields:***
-
-The unsupported fields are unlikely to needed to be manually specified in the scope and use case of this project.
-Some fields are autogenerated. Others are defined by the SPDX specification as optional, and can be omitted.
-If you need any of these fields for your use case/workflow, consider opening an issue or a pull request. We are happy to help you out or accept contributions.
-
-- `Creator` (spdx clause 6.8)
-  - This field is required by the SPDX specification, and autogenerated by this project based on the `SUPPLIER` argument.
-  - Used to specify the creator of the SBOM.
-  - The SPDX specification differentiates between Creator of the SBOM and Supplier of the Package it describes, while this project threats them as the same entity.
-  - We base this on the assumption that whoever uses this project, uses it to generate a SBOM for a package they are building. In this case, the creator of the SBOM and the supplier of the package are the same entity.
-- `PackageOriginator` (spdx clause 7.6)
-  - This field is optional in the SPDX specification, and can be omitted.
-  - Used to specify the original creator of the package.
-  - In the use case of this project, the PackageOriginator is unlikely to be a different entity than the Supplier of the Package.
-  - We base this on the assumption that whoever uses this project, uses it to generate a SBOM for a package they are building. In this case, the supplier mentioned in `SUPPLIER` is also the initial distributor of the package.
-- `PackageSourceInfo:` (spdx clause 7.12)
-  - This field is optional in the SPDX specification, and can be omitted.
-  - Used to record any relevant background information about the origin of the package.
-  - This is probably not needed for a package that is built by the creator of the SBOM.
-- `PackageLicenseComments` (spdx clause 7.16)
-  - This field is optional in the SPDX specification, and can be omitted.
-  - Used to record any additional information that went in to arriving at the concluded license.
-- `PackageComment` (spdx clause 7.20)
-  - SBOM-Builder adds a comment describing the build configuration. This comment is not customizable.
-- `Created` (spdx clause 6.9)
-  - This field is required by the SPDX specification, and autogenerated when the sbom is generated.
-- `ReleaseDate` & `BuildDate` (spdx clause 7.25 & 7.24)
-  - These fields are optional in the SPDX specification, and can be omitted.
-  - The SBOM-Builder adds the current date and time to both fields automatically. Both fields are set to the same value.
-  - Nowadays, most projects use a release pipeline, where everything is generated from scratch for each release. In this case, the release date and build date are the same.
-- ***Not yet implemented.***
-  - `PackageChecksum` (spdx clause 7.10)
-  - `ExternalRef` (spdx clause 7.21)
-  - `ExternalRefComment` (spdx clause 7.22)
-  - `PackageAttributionText` (spdx clause 7.23)
-  - `ValidUnitlDate` (spdx clause 7.27)
+  - See [SPDX clause 7.24](https://spdx.github.io/spdx-spec/v2.3/package-information/#724-primary-package-purpose-field) for more information.
 
 ### `sbom_add_file`
 

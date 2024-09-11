@@ -11,7 +11,7 @@ sbom_generate(
 	OUTPUT "./full-sbom.spdx"
 	PACKAGE_COPYRIGHT "2023 me"
 	NAMESPACE "https://test.com/spdxdoc/me"
-	SUPPLIER ORGANIZATION FullDocTest
+	CREATOR ORGANIZATION FullDocTest
 	PACKAGE_URL https://www.fullDocTest.com
 )
 

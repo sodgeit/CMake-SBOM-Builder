@@ -6,7 +6,7 @@
 
 include(sbom)
 
-sbom_generate(SUPPLIER NOASSERTION PACKAGE_URL https://www.minimal_test.com)
+sbom_generate(CREATOR PERSON "Minimal2" PACKAGE_URL https://www.minimal_test.com)
 sbom_finalize()
 
 @TEST_VERIFY@
