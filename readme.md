@@ -118,7 +118,7 @@ To download a specific version:
 file(
 	DOWNLOAD
 	https://github.com/sodgeit/CMake-SBOM-Builder/releases/download/v0.2.1/sbom.cmake
-	${CMAKE_SOURCE_DIR}/cmake/sbom.cmake
+	${CMAKE_CURRENT_BINARY_DIR}/cmake/sbom.cmake
 	EXPECTED_HASH SHA256=7b354f3a5976c4626c876850c93944e52c83ec59a159ae5de5be7983f0e17a2a
 )
 ```
@@ -129,7 +129,7 @@ Or always download the latest release:
 file(
 	DOWNLOAD
 	https://github.com/sodgeit/CMake-SBOM-Builder/releases/latest/download/sbom.cmake
-	${CMAKE_SOURCE_DIR}/cmake/sbom.cmake
+	${CMAKE_CURRENT_BINARY_DIR}/cmake/sbom.cmake
 	EXPECTED_HASH SHA256=7b354f3a5976c4626c876850c93944e52c83ec59a159ae5de5be7983f0e17a2a
 )
 ```
@@ -137,7 +137,7 @@ file(
 And then just include the file:
 
 ```cmake
-include(cmake/sbom.cmake)
+include(${CMAKE_CURRENT_BINARY_DIR}/cmake/sbom.cmake)
 ```
 
 ### Build and install your project
