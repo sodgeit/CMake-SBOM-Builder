@@ -1,17 +1,19 @@
 # CMake SBOM Builder
 
-This project provides a CMake module that helps your to generate Software Bill of Materials (SBOM) in `SPDX`-format for an arbitrary CMake project.
+Generating SPDX Software Bill of Materials (SBOMs) for arbitrary CMake projects.
 
-This Project only supports SPDX version 2.3. The SPDX specification is available [here](https://spdx.github.io/spdx-spec/v2.3/).
+The CMake-SBOM-Builder aims to be compliant with:
+
+- [Technical Guideline TR-03183](https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Publications/TechGuidelines/TR03183/BSI-TR-03183-2.pdf?__blob=publicationFile&v=5) of the German Federal Office for Information Security (BSI)
+- The US [Executive Order 14028](https://www.nist.gov/itl/executive-order-14028-improving-nations-cybersecurity/software-security-supply-chains-software-1)
+- [SPDX Specification 2.3](https://spdx.github.io/spdx-spec/v2.3/)
 
 It automates two tasks:
 
 - extracting version information from Git, and passing it to CMake, shell scripts, and C/C++
-- generating a SBOM in SPDX format, based on install artifacts
+- generating a SBOM in SPDX format, based on install artifacts, and the package dependencies you specify
 
-The version extraction helps to get the version in the application and SBOM right. The SBOM contains the files you mention explicitly, just like you mention what to `install()` in CMake.
-
-To integrate this library in your project, see [below](#how-to-use) for basic instructions or the example for a simple example project.
+To get started, take a look at the [example](#example) and how to [add the SBOM-Builder to your project](#adding-sbom-builder-to-your-project).
 
 ---
 
@@ -24,9 +26,10 @@ Major Changes include:
 
 - **Single-File Integration**: We condensed everything into a single file to facilitate integration with CMake's `file` command, making it simpler and more efficient to use.
 - **Multi Config Generator Enhancements**: The SBOM generation better integrates with multi-config generators like Visual Studio and Ninja Multi-Config. Different SBOM's are generated for each configuration.
-- **Removed External Python Tools**: The verification process that relied on external Python tools has been removed to minimize dependencies and simplify the setup.
 - **Modernized CMake**: A higher minimum required version (>=3.16), ensuring better compatibility and taking advantage of newer functionalities.
-- **Wider support for SPDX fields**: While the original project focused on the most important SPDX fields, to keep SBOM generation simple, we added support for more SPDX fields to provide more flexibility and customization, while maintaining the initial vision of auto-generating most fields.
+- **Wider support for SPDX 2.3**: More SPDX fields are supported for better compliance with the SPDX 2.3 specification.
+- **Compliance with BSI-Guidelines**
+- **Improved Documentation**
 
 ---
 
@@ -178,22 +181,22 @@ Generates the SBOM creator information and the package information of the packag
 
 ```cmake
 sbom_generate(
-   CREATOR <PERSON|ORGANIZATION> <name> [EMAIL <email>]
-   [OUTPUT <filename>]
-   [NAMESPACE <URI>]
-   [PACKAGE_NAME <package_name>]
-   [PACKAGE_VERSION <version_string>]
-   [PACKAGE_FILENAME <filename>]
-   [PACKAGE_DOWNLOAD <NOASSERTION|NONE|<url>>]
-   [PACKAGE_URL <NOASSERTION|NONE|<url>>]
-   [PACKAGE_LICENSE <NOASSERTION|NONE|<SPDX License Expression>>]
-   [PACKAGE_COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
-   [PACKAGE_NOTES [SUMMARY <summary_text>]
-                  [DESCRIPTION <description_text>] ]
-   [PACKAGE_PURPOSE <APPLICATION|FRAMEWORK|LIBRARY|
-                     CONTAINER|OPERATING-SYSTEM|DEVICE|
-                     FIRMWARE|SOURCE|ARCHIVE|
-                     FILE|INSTALL|OTHER>...]
+	CREATOR <PERSON|ORGANIZATION> <name> [EMAIL <email>]
+	PACKAGE_LICENSE <SPDX License Expression>
+	[PACKAGE_NAME <package_name>]
+	[PACKAGE_VERSION <version_string>]
+	[PACKAGE_FILENAME <filename>]
+	[PACKAGE_DOWNLOAD <NOASSERTION|NONE|<url>>]
+	[PACKAGE_URL <NOASSERTION|NONE|<url>>]xg
+	[PACKAGE_COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
+	[PACKAGE_NOTES [SUMMARY <summary_text>]
+	               [DESCRIPTION <description_text>] ]
+	[PACKAGE_PURPOSE <APPLICATION|FRAMEWORK|LIBRARY|
+	                  CONTAINER|OPERATING-SYSTEM|DEVICE|
+	                  FIRMWARE|SOURCE|ARCHIVE|
+	                  FILE|INSTALL|OTHER>...]
+	[OUTPUT <filename>]
+	[NAMESPACE <URI>]
 )
 ```
 
@@ -207,13 +210,13 @@ sbom_generate(
   - ***Note:***
     - The SPDX specification differentiates between the creator of the SBOM and the supplier of the package it describes. However, this project treats them as the same entity. This is based on the assumption that whoever uses this project, uses it to generate a SBOM for a package they are building. In this case, the creator of the SBOM and the supplier of the package are the same entity.
     - The SBOM-Builder is always added as an additional creator of the SBOM.
-- `OUTPUT`: Output filename.
-  - Can be absolute or relative to `CMAKE_INSTALL_PREFIX`.
-  - Default location is `${CMAKE_INSTALL_PREFIX}/share/${PACKAGE_NAME}-sbom-${GIT_VERSION_PATH}.spdx`.
-  - `--prefix` option is honoured when added to the install command.
-  - `--prefix` and `${CMAKE_INSTALL_PREFIX}` have no effect when `OUTPUT` is an absolute path.
-- `NAMESPACE`: Document namespace.
-  - If not specified, default to a URL based on `PACKAGE_URL`, `PACKAGE_NAME` and `PACKAGE_VERSION`.
+- `PACKAGE_LICENSE`: License of the package described in the SBOM.
+  - Requires a valid SPDX license expression. See [SPDX License Expressions](https://spdx.github.io/spdx-spec/v2.3/SPDX-license-expressions/) for more information.
+  - ***Note:***
+    - The SPDX specification differentiates between a declared and a concluded license. This argument sets both to the same value.
+    - We assume that the creator of the SBOM is the supplier of the package, there should be no difference between the declared and concluded license.
+    - See [SPDX clause 7.13](https://spdx.github.io/spdx-spec/v2.3/package-information/#713-concluded-license-field) & [SPDX clause 7.15](https://spdx.github.io/spdx-spec/v2.3/package-information/#715-declared-license-field) for more information.
+    - The federal guidelines mentioned above do not explicitly allow the use of `NOASSERTION` or `NONE`. We therefore do not provide these options.
 - `PACKAGE_NAME`: Package name.
   - Defaults to `${PROJECT_NAME}`.
   - See [SPDX clause 7.1](https://spdx.github.io/spdx-spec/v2.3/package-information/#71-package-name-field) for more information.
@@ -231,13 +234,6 @@ sbom_generate(
   - `NONE` or `NOASSERTION` require that `NAMESPACE` is provided.
   - otherwise `<url>` is required.
   - See [SPDX clause 7.11](https://spdx.github.io/spdx-spec/v2.3/package-information/#711-package-home-page-field) for more information.
-- `PACKAGE_LICENSE`: License of the package described in the SBOM.
-  - Requires one of `NOASSERTION`, `NONE`, or a valid SPDX license expression.
-  - If omitted, defaults to `NOASSERTION`.
-  - See [SPDX clause 7.13](https://spdx.github.io/spdx-spec/v2.3/package-information/#713-concluded-license-field) & [SPDX clause 7.15](https://spdx.github.io/spdx-spec/v2.3/package-information/#715-declared-license-field) for more information.
-  - ***Note:***
-    - The SPDX specification differentiates between a declared and a concluded license. This argument sets both to the same value.
-    - Assuming that the creator of the SBOM is the supplier of the package, there should be no difference between the declared and concluded license.
 - `PACKAGE_COPYRIGHT`: Copyright information.
   - Either `NOASSERTION`, `NONE`, or a `<copyright_text>`.
   - Defaults to `<year> <name>` where `<name>` is the `CREATOR` name.
@@ -259,17 +255,24 @@ sbom_generate(
     - `sbom_generate(... PACKAGE_PURPOSE "APPLICATION" "FIRMWARE" ...)`
     - `sbom_generate(... PACKAGE_PURPOSE "FILE" "SOURCE" "LIBRARY" ...)`
   - See [SPDX clause 7.24](https://spdx.github.io/spdx-spec/v2.3/package-information/#724-primary-package-purpose-field) for more information.
+- `OUTPUT`: Output filename + path.
+  - Can be absolute or relative to `CMAKE_INSTALL_PREFIX`.
+  - Default location is `${CMAKE_INSTALL_PREFIX}/share/${PACKAGE_NAME}-sbom-${GIT_VERSION_PATH}.spdx`.
+  - `--prefix` option is honoured when added to the install command.
+  - `--prefix` and `${CMAKE_INSTALL_PREFIX}` have no effect when `OUTPUT` is an absolute path.
+- `NAMESPACE`: Document namespace.
+  - If not specified, default to a URL based on `PACKAGE_URL`, `PACKAGE_NAME` and `PACKAGE_VERSION`.
 
 ### `sbom_add_file`
 
 ```cmake
 sbom_add_file(
 	<filename>
+	LICENSE <SPDX License Expression> [COMMENT <comment_text>]
 	[SPDXID <id>]
 	[RELATIONSHIP <string>]
 	[FILETYPE <SOURCE|BINARY|ARCHIVE|APPLICATION|AUDIO|IMAGE|TEXT|VIDEO|DOCUMENTATION|SPDX|OTHER>...]
 	[CHECKSUM <MD5|SHA224|SHA256|SHA386|SHA512|SHA3_256|SHA3_384|SHA3_512>...]
-	[LICENSE <NOASSERTION|NONE|<SPDX License Expression>> [COMMENT <comment_text>]]
 	[COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
 	[COMMENT <comment_text>]
 	[NOTICE <notice_text>]
@@ -281,6 +284,12 @@ sbom_add_file(
 - `filename`: A path to the file to add, relative to `CMAKE_INSTALL_PREFIX`.
   - Generator expressions are supported.
   - See [SPDX clause 8.1](https://spdx.github.io/spdx-spec/v2.3/file-information/#81-file-name-field) for more information.
+- `LICENSE`: License of the file.
+  - See [SPDX clause 8.5](https://spdx.github.io/spdx-spec/v2.3/file-information/#85-concluded-license-field) for more information.
+  - Requires a valid SPDX license expression. See [SPDX License Expressions](https://spdx.github.io/spdx-spec/v2.3/SPDX-license-expressions/) for more information.
+  - Optionally, add `COMMENT` to record any additional information that went in to arriving at the concluded license.
+    - No SBOM entry when omitted.
+    - See [SPDX clause 8.7](https://spdx.github.io/spdx-spec/v2.3/file-information/#87-comments-on-license-field) for more information.
 - `SPDXID`: The ID to use for identifier generation.
   - If omitted generates a new one.
   - See [SPDX clause 8.2](https://spdx.github.io/spdx-spec/v2.3/file-information/#82-file-spdx-identifier-field) for more information.
@@ -303,21 +312,14 @@ sbom_add_file(
     - `sbom_add_file(... FILETYPE "BINARY" ...)`
     - `sbom_add_file(... FILETYPE "ARCHIVE" ...)`
 - `CHECKSUM`: Checksums to be generated for the file.
-  - The SPDX-Specification requires a SHA1 checksum to be generated. This is always done automatically.
+  - SPDX and TR-03183 require a SHA1 and SHA256 respectively to be generated. This is always done automatically.
   - With this argument, additional checksums can be specified.
   - See [SPDX clause 8.4](https://spdx.github.io/spdx-spec/v2.3/file-information/#84-file-checksum-field) for more information.
   - One or many of the following keywords:
-    - `MD5`, `SHA224`, `SHA256`, `SHA384`, `SHA512`, `SHA3_256`, `SHA3_384`, `SHA3_512`.
+    - `MD5`, `SHA224`, `SHA384`, `SHA512`, `SHA3_256`, `SHA3_384`, `SHA3_512`.
     - These are the set of hash algorithms that CMake supports and are defined in the SPDX specification.
   - Usage:
-    - `sbom_add_file(... CHECKSUM SHA256 SHA3_512 ...)`
-- `LICENSE`: License of the file.
-  - If omitted, defaults to `NOASSERTION`.
-  - See [SPDX clause 8.5](https://spdx.github.io/spdx-spec/v2.3/file-information/#85-concluded-license-field) for more information.
-  - Either `NOASSERTION`, `NONE`, or a valid SPDX license expression must follow `LICENSE`.
-  - Optionally, add `COMMENT` to record any additional information that went in to arriving at the concluded license.
-    - No SBOM entry when omitted.
-    - See [SPDX clause 8.7](https://spdx.github.io/spdx-spec/v2.3/file-information/#87-comments-on-license-field) for more information.
+    - `sbom_add_file(... CHECKSUM MD5 SHA3_512 ...)` This would in total generate SHA1, SHA256, MD5, and SHA3_512 checksums.
 - `COPYRIGHT`: Copyright information.
   - When omitted defaults to `NOASSERTION`.
   - See [SPDX clause 8.8](https://spdx.github.io/spdx-spec/v2.3/file-information/#88-copyright-text-field) for more information.
@@ -370,19 +372,19 @@ The supported options for `sbom_add_target` are the same as those for [`sbom_add
 ```cmake
 sbom_add_package(
 	<name>
+	LICENSE <SPDX License Expression>
+	        [DECLARED <NOASSERTION|NONE|<SPDX License Expression>> ]
+	        [COMMENT <comment_text> ]
+	VERSION <version_string>
+	SUPPLIER <PERSON|ORGANIZATION> <name> [EMAIL <email>]
 	[SPDXID <id>]
 	[RELATIONSHIP <string>]
-	[VERSION <version_string>]
 	[FILENAME <filename>]
-	[SUPPLIER <NOASSERTION|PERSON|ORGANIZATION> <name> [EMAIL <email>]]
 	[ORIGINATOR <NOASSERTION|PERSON|ORGANIZATION> <name> [EMAIL <email>]]
 	[DOWNLOAD <NOASSERTION|NONE|<url|vcs>>]
 	[CHECKSUM <<algorithm> <checksum>>...]
 	[URL <NOASSERTION|NONE|<url>>]
 	[SOURCE_INFO <source_info_text>]
-	[LICENSE <NOASSERTION|NONE|<SPDX License Expression>>
-	         [DECLARED <NOASSERTION|NONE|<SPDX License Expression>> ]
-	         [COMMENT <comment_text> ] ]
 	[COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
 	[NOTES [SUMMARY <summary_text>]
 	       [DESC <summary_text>]
@@ -404,6 +406,32 @@ sbom_add_package(
   - Use the name that is given by the author or package manager.
   - The package files are not analysed further.
   - It is assumed that this package is a dependency of the project.
+- `LICENSE`: License of the package described in the SBOM.
+  - Requires a valid SPDX license expression. See [SPDX License Expressions](https://spdx.github.io/spdx-spec/v2.3/SPDX-license-expressions/) for more information.
+    - The federal guidelines mentioned above do not explicitly allow the use of `NOASSERTION` or `NONE`. We therefore do not provide these options.
+  - This is the license that the creator of the SBOM concluded the package has, which may differ from the declared license of the package supplier.
+    - See [SPDX clause 7.13](https://spdx.github.io/spdx-spec/v2.3/package-information/#713-concluded-license-field)
+  - Add `DECLARED` to specify the declared license.
+    - Either `NOASSERTION`, `NONE`, or a valid SPDX license expression must follow `DECLARED`.
+    - When omitted defaults to `NOASSERTION`.
+    - See [SPDX clause 7.15](https://spdx.github.io/spdx-spec/v2.3/package-information/#715-declared-license-field) for more information.
+  - Add `COMMENT` to record any additional information that went in to arriving at the concluded license.
+    - No SBOM entry when omitted.
+    - See [SPDX clause 7.16](https://spdx.github.io/spdx-spec/v2.3/package-information/#716-comments-on-license-field) for more information.
+    - SPDX recommends to use this field also when `NOASSERTION` is set.
+  - Usage:
+    - `sbom_add_package(... LICENSE "MIT" DECLARED "MIT" ...)`
+    - `sbom_add_package(... LICENSE "MIT" DECLARED NONE COMMENT "No package level license can be found. The files are licensed individually. All files are MIT licensed." ...)`
+- `VERSION`: Package version field
+  - Required by the TR-03183.
+  - See [SPDX clause 7.3](https://spdx.github.io/spdx-spec/v2.3/package-information/#73-package-version-field) for more information.
+- `SUPPLIER`: Supplier of the Package
+  - One of `<PERSON|ORGANIZATION>` keywords must follow `SUPPLIER`.
+  - `EMAIL` is optional.
+  - Usage:
+    - `sbom_add_package(... SUPPLIER ORGANIZATION "Package Distributor" EMAIL "contact@email.com" ...)`
+    - `sbom_add_package(... SUPPLIER PERSON "Firstname Lastname" ...)`
+  - See [SPDX clause 7.5](https://spdx.github.io/spdx-spec/v2.3/package-information/#75-package-supplier-field) for more information.
 - `SPDXID`: The ID to use for identifier generation. (spdx clause 7.2)
   - By default, generate a new one. Whether or not this is specified, the variable `SBOM_LAST_SPDXID` is set to just generated/used SPDXID, which could be used for later relationship definitions.
 - `RELATIONSHIP`: A relationship definition related to this package.
@@ -420,9 +448,6 @@ sbom_add_package(
     - This will ***replace*** the default relationship added, which is: `SPDXRef-${PACKAGE_NAME} DEPENDS_ON @SBOM_LAST_SPDXID@`
     - Only one relationship can be added.
     - The Relationship: `@SBOM_LAST_SPDXID@ CONTAINS NOASSERTION` is always added, which can cause confusion.
-- `VERSION`: Package version field
-  - No SBOM entry when omitted.
-  - See [SPDX clause 7.3](https://spdx.github.io/spdx-spec/v2.3/package-information/#73-package-version-field) for more information.
 - `FILENAME`: Filename of the package.
   - No SBOM entry when omitted.
   - See [SPDX clause 7.4](https://spdx.github.io/spdx-spec/v2.3/package-information/#74-package-file-name-field) for more information.
@@ -430,17 +455,6 @@ sbom_add_package(
   - Can include relative path from `CMAKE_INSTALL_PREFIX` if it part of your install artifacts.
   - Usage:
     - `sbom_add_package(... FILENAME "./lib/libmodbus.so" ...)`
-- `SUPPLIER`: Supplier of the Package
-  - No SBOM entry when omitted.
-  - See [SPDX clause 7.5](https://spdx.github.io/spdx-spec/v2.3/package-information/#75-package-supplier-field) for more information.
-  - One of `<NOASSERTION|PERSON|ORGANIZATION>` keywords must follow `SUPPLIER`.
-    - For `NOASSERTION`: `<name>` and `EMAIL` are not used.
-  - `<name>` is either a person or organization name.
-  - `EMAIL` is optional.
-  - Usage:
-    - `sbom_add_package(... SUPPLIER ORGANIZATION "Package Distributor" EMAIL "contact@email.com" ...)`
-    - `sbom_add_package(... SUPPLIER PERSON "Firstname Lastname" ...)`
-    - `sbom_add_package(... SUPPLIER NOASSERTION ...)`
 - `ORIGINATOR`: Originator of the Package
   - No SBOM entry when omitted.
   - See [SPDX clause 7.6](https://spdx.github.io/spdx-spec/v2.3/package-information/#76-package-originator-field) for more information.
@@ -470,28 +484,6 @@ sbom_add_package(
 - `SOURCE_INFO`: Background information about the origin of the package.
   - No SBOM entry when omitted.
   - See [SPDX clause 7.12](https://spdx.github.io/spdx-spec/v2.3/package-information/#712-source-information-field) for more information.
-- `LICENSE`: Concluded license of the package.
-  - When omitted defaults to `NOASSERTION`.
-    - This field is optional in the SPDX specification.
-    - If the field is not present in the SBOM, `NOASSERTION` is implied as per SPDX specification.
-  - See [SPDX clause 7.13](https://spdx.github.io/spdx-spec/v2.3/package-information/#713-concluded-license-field) for more information.
-  - Either `NOASSERTION`, `NONE`, or a valid SPDX license expression must follow `LICENSE`.
-    - See [SPDX License Expressions](https://spdx.github.io/spdx-spec/v2.3/SPDX-license-expressions/) for valid expressions.
-    - The License expression is not verified by this project.
-  - This is the license that the creator of the SBOM concluded the package has, which may differ from the declared license of the package supplier.
-  - Add `DECLARED` to specify the declared license.
-    - When omitted defaults to `NOASSERTION`.
-      - Same reasoning as for the concluded license.
-    - See [SPDX clause 7.15](https://spdx.github.io/spdx-spec/v2.3/package-information/#715-declared-license-field) for more information.
-    - Either `NOASSERTION`, `NONE`, or a valid SPDX license expression must follow `DECLARED`.
-  - Add `COMMENT` to record any additional information that went in to arriving at the concluded license.
-    - No SBOM entry when omitted.
-    - See [SPDX clause 7.16](https://spdx.github.io/spdx-spec/v2.3/package-information/#716-comments-on-license-field) for more information.
-    - SPDX recommends to use this field also when `NOASSERTION` is set.
-  - Usage:
-    - `sbom_add_package(... LICENSE "MIT" DECLARED "MIT" ...)`
-    - `sbom_add_package(... LICENSE "MIT" DECLARED NONE COMMENT "No package level license can be found. The files are licensed individually. All files are MIT licensed." ...)`
-    - `sbom_add_package(... LICENSE NONE ...)`
 - `COPYRIGHT`: Copyright information.
   - When omitted defaults to `NOASSERTION`.
     - This field is optional in the SPDX specification.
