@@ -211,6 +211,8 @@ sbom_generate(
 sbom_add_[file|directory|target](
 	<filename|path|target>
 	LICENSE <SPDX License Expression> [COMMENT <comment_text>]
+	[RELATIONSHIP <string>]
+	[COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
 )
 ```
 
@@ -219,6 +221,11 @@ sbom_add_[file|directory|target](
   - Generator expressions are supported.
 - `LICENSE`: License of the file.
   - Optionally, add `COMMENT` to record any additional information that went in to arriving at the concluded license.
+- `RELATIONSHIP`:
+  - Defaults to `${Project} CONTAINS <filename|path|target>`
+  - Use this argument to override the default relationship. See [SPDX clause 11](https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/) for more information.
+- `COPYRIGHT`:
+  - Defaults to NOASSERTION.
 
 ### `sbom_add_package`
 
@@ -228,6 +235,7 @@ sbom_add_package(
 	LICENSE <SPDX License Expression>
 	VERSION <version_string>
 	SUPPLIER <PERSON|ORGANIZATION> <name> [EMAIL <email>]
+	[RELATIONSHIP <string>]
 	...
 )
 ```
@@ -238,6 +246,8 @@ sbom_add_package(
 - `SUPPLIER`: Supplier of the package.
   - One of the `<PERSON|ORGANIZATION>` keywords must be provided.
   - `EMAIL` is optional.
+- `RELATIONSHIP`: Defaults to `${Project} DEPENDS_ON <name>`.
+  - Use this argument to override the default relationship. See [SPDX clause 11](https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/) for more information.
 
 ### `sbom_add_external`
 
@@ -255,6 +265,7 @@ sbom_add_external(
 - `path`: Reference to another SDPX file as External document reference. Then, depend on the package named in that document. The external SDPX file is copied next to the SBOM. Generator expressions are supported.
 - `RENAME`: Rename the external document to the given filename, without directories.
 - `SPDXID`: The identifier of the external document, which is used as prefix for the package identifier. Defaults to a unique identifier. The package identifier is added automatically. The variable `SBOM_LAST_SPDXID` is set to the used identifier.
+- `RELATIONSHIP`: Defaults to `${Project} DEPENDS_ON <id>`
 
 ### `sbom_finalize`
 
