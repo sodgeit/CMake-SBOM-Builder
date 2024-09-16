@@ -96,7 +96,7 @@ sbom_generate(
 ```cmake
 sbom_add_[file|directory|target](
 	<filename|path|target>
-	LICENSE <SPDX License Expression> [COMMENT <comment_text>]
+	[LICENSE <SPDX License Expression> [COMMENT <comment_text>]]
 	[SPDXID <id>]
 	[RELATIONSHIP <string>]
 	[FILETYPE <SOURCE|BINARY|ARCHIVE|APPLICATION|AUDIO|IMAGE|TEXT|VIDEO|DOCUMENTATION|SPDX|OTHER>...]
@@ -113,11 +113,12 @@ sbom_add_[file|directory|target](
   - Generator expressions are supported.
   - See [SPDX clause 8.1](https://spdx.github.io/spdx-spec/v2.3/file-information/#81-file-name-field) for more information.
 - `LICENSE`: License of the file.
+  - Defaults to the license of the package. (`PACKAGE_LICENSE` from `sbom_generate()`)
   - See [SPDX clause 8.5](https://spdx.github.io/spdx-spec/v2.3/file-information/#85-concluded-license-field) for more information.
   - Requires a valid SPDX license expression. See [SPDX License Expressions](https://spdx.github.io/spdx-spec/v2.3/SPDX-license-expressions/) for more information.
-  - Optionally, add `COMMENT` to record any additional information that went in to arriving at the concluded license.
-    - No SBOM entry when omitted.
-    - See [SPDX clause 8.7](https://spdx.github.io/spdx-spec/v2.3/file-information/#87-comments-on-license-field) for more information.
+  - If you are adding a target or file from one of your dependencies, specify their license.
+    - Optionally, add `COMMENT` to record any additional information that went in to arriving at the concluded license.
+      - See [SPDX clause 8.7](https://spdx.github.io/spdx-spec/v2.3/file-information/#87-comments-on-license-field) for more information.
 - `SPDXID`: The ID to use for identifier generation.
   - If omitted generates a new one.
   - See [SPDX clause 8.2](https://spdx.github.io/spdx-spec/v2.3/file-information/#82-file-spdx-identifier-field) for more information.
@@ -149,9 +150,10 @@ sbom_add_[file|directory|target](
   - Usage:
     - `sbom_add_file(... CHECKSUM MD5 SHA3_512 ...)` This would in total generate SHA1, SHA256, MD5, and SHA3_512 checksums.
 - `COPYRIGHT`: Copyright information.
-  - When omitted defaults to `NOASSERTION`.
+  - Defaults to the copyright of the package. (`PACKAGE_COPYRIGHT` from `sbom_generate()`)
   - See [SPDX clause 8.8](https://spdx.github.io/spdx-spec/v2.3/file-information/#88-copyright-text-field) for more information.
-  - Either `NOASSERTION`, `NONE`, or a `<copyright_text>` must follow `COPYRIGHT`.
+  - If you are adding a target or file from one of your dependencies, specify their copyright text.
+    - Use `NOASSERTION` or `NONE` if the information cannot be determined or is not specified.
 - `COMMENT`: Additional comments about the file.
   - No SBOM entry when omitted.
   - See [SPDX clause 8.12](https://spdx.github.io/spdx-spec/v2.3/file-information/#812-file-comment-field) for more information.

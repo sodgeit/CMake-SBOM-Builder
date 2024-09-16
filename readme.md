@@ -210,9 +210,9 @@ sbom_generate(
 ```cmake
 sbom_add_[file|directory|target](
 	<filename|path|target>
-	LICENSE <SPDX License Expression> [COMMENT <comment_text>]
-	[RELATIONSHIP <string>]
+	[LICENSE <SPDX License Expression>]
 	[COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
+	[RELATIONSHIP <string>]
 )
 ```
 
@@ -220,12 +220,16 @@ sbom_add_[file|directory|target](
   - A path to a file/directory, relative to `CMAKE_INSTALL_PREFIX`, or a target name, to be added to the SBOM. Target have to be installed using `install(TARGETS ...)`.
   - Generator expressions are supported.
 - `LICENSE`: License of the file.
-  - Optionally, add `COMMENT` to record any additional information that went in to arriving at the concluded license.
+  - Defaults to the license of the package. (`PACKAGE_LICENSE` from `sbom_generate()`)
+  - If you are adding a target or file from one of your dependencies, specify their license.
+    - Check the full signature for more information in such cases.
+- `COPYRIGHT`:
+  - Defaults to the copyright of the package. (`PACKAGE_COPYRIGHT` from `sbom_generate()`)
+  - If you are adding a target or file from one of your dependencies, specify thier copyright text.
+    - Use `NOASSERTION` or `NONE` if the information cannot be determined or is not specified.
 - `RELATIONSHIP`:
   - Defaults to `${Project} CONTAINS <filename|path|target>`
   - Use this argument to override the default relationship. See [SPDX clause 11](https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/) for more information.
-- `COPYRIGHT`:
-  - Defaults to NOASSERTION.
 
 ### `sbom_add_package`
 
@@ -242,6 +246,7 @@ sbom_add_package(
 
 - `name`: The name of the package.
 - `LICENSE`: License of the package.
+  - Check the full signature for more information, if the license is not specified, cannot be determined, or contains exceptions.
 - `VERSION`: Version of the package.
 - `SUPPLIER`: Supplier of the package.
   - One of the `<PERSON|ORGANIZATION>` keywords must be provided.

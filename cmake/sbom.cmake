@@ -687,7 +687,9 @@ function(sbom_generate)
 	set_property(GLOBAL PROPERTY SBOM_FILENAME "${SBOM_GENERATE_OUTPUT}")
 	set_property(GLOBAL PROPERTY SBOM_BINARY_DIR "${SBOM_BINARY_DIR}")
 	set_property(GLOBAL PROPERTY SBOM_SNIPPET_DIR "${SBOM_SNIPPET_DIR}")
-	set_property(GLOBAL PROPERTY sbom_project "${SBOM_GENERATE_PACKAGE_NAME}")
+	set_property(GLOBAL PROPERTY sbom_package_spdxid "${SBOM_GENERATE_PACKAGE_NAME}")
+	set_property(GLOBAL PROPERTY sbom_package_license "${SBOM_GENERATE_PACKAGE_LICENSE}")
+	set_property(GLOBAL PROPERTY sbom_package_copyright "${SBOM_GENERATE_PACKAGE_COPYRIGHT}")
 	set_property(GLOBAL PROPERTY sbom_spdxids 0)
 
 	#REFAC(>=3.20): Use cmake_path() instead of get_filename_component().
@@ -743,7 +745,7 @@ function(sbom_finalize)
 	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
 	get_property(_sbom_binary_dir GLOBAL PROPERTY SBOM_BINARY_DIR)
 	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
-	get_property(_sbom_project GLOBAL PROPERTY sbom_project)
+	get_property(_sbom_project GLOBAL PROPERTY sbom_package_spdxid)
 
 	if("${_sbom_project}" STREQUAL "")
 		message(FATAL_ERROR "Call sbom_generate() first")
@@ -773,11 +775,11 @@ configure_file(\"\${SBOM_INTERMEDIATE_FILE}\" \"\${SBOM_EXPORT_FILENAME}\")
 
 	# Mark finalized.
 	set(SBOM_FILENAME "${_sbom}" PARENT_SCOPE)
-	set_property(GLOBAL PROPERTY sbom_project "")
+	set_property(GLOBAL PROPERTY sbom_package_spdxid "")
 endfunction()
 
 macro(_sbom_builder_is_setup)
-	get_property(_sbom_project GLOBAL PROPERTY sbom_project)
+	get_property(_sbom_project GLOBAL PROPERTY sbom_package_spdxid)
 
 	if("${_sbom_project}" STREQUAL "")
 		message(FATAL_ERROR "Call sbom_generate() first")
@@ -814,8 +816,9 @@ function(_sbom_add_path PATH)
 	set(_fields "")
 
 	set(_arg_add_path_LICENSE_DECLARED "NOASSERTION")
-	if(NOT DEFINED _arg_add_path_LICENSE) #??? maybe use package license as default?
-		message(FATAL_ERROR "Missing LICENSE argument for ${PATH}.")
+	if(NOT DEFINED _arg_add_path_LICENSE)
+		get_property(_sbom_package_license GLOBAL PROPERTY sbom_package_license)
+		set(_arg_add_path_LICENSE "${_sbom_package_license}")
 	endif()
 	_sbom_parse_license("CONCLUDED;${_arg_add_path_LICENSE}" _arg_add_path_LICENSE_CONCLUDED _arg_add_path_LICENSE_DECLARED _arg_add_path_LICENSE_COMMENT)
 	string(APPEND _fields "\nLicenseConcluded: ${_arg_add_path_LICENSE_CONCLUDED}")
@@ -843,7 +846,8 @@ function(_sbom_add_path PATH)
 	endif()
 
 	if(NOT DEFINED _arg_add_path_COPYRIGHT)
-		set(_arg_add_path_COPYRIGHT "NOASSERTION") #??? maybe use package copyright as default?
+		get_property(_sbom_package_copyright GLOBAL PROPERTY sbom_package_copyright)
+		set(_arg_add_path_COPYRIGHT "${_sbom_package_copyright}")
 	endif()
 	string(APPEND _fields "\nFileCopyrightText: ${_arg_add_path_COPYRIGHT}")
 
