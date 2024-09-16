@@ -94,7 +94,7 @@ include(${CMAKE_CURRENT_BINARY_DIR}/cmake/sbom.cmake)
 
 2. With `sbom_add_file()`, `sbom_add_directory()`, or `sbom_add_target()` you can declare the contents of the package. These should cover all files, executables, libraries, etc. that are part of the distribution and are installed using CMake's `install()` command.
 
-3. `sbom_add_package()` is used to define dependencies for the package as a whole. For single-file dependencies, use the `RELATIONSHIP` argument to override the default behaviour. All dependencies are treated as black boxes, meaning their internal contents are not specified or analysed further.
+3. `sbom_add_package()` is used to define dependencies for your package as a whole. For single-file dependencies, use the `RELATIONSHIP` argument to override the default behaviour. All dependencies are treated as black boxes, meaning their internal contents are not specified or analysed further.
 
 4. Finally, call `sbom_finalize()` to finish the SBOM definition.
 
@@ -228,7 +228,8 @@ sbom_add_[file|directory|target](
   - If you are adding a target or file from one of your dependencies, specify thier copyright text.
     - Use `NOASSERTION` or `NONE` if the information cannot be determined or is not specified.
 - `RELATIONSHIP`:
-  - Defaults to `${Project} CONTAINS <filename|path|target>`
+  - Defaults to `<project_id> CONTAINS <id>`
+    - `<project_id>` and `<id>`are placeholders for the SPDX identifiers that are automatically generated.
   - Use this argument to override the default relationship. See [SPDX clause 11](https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/) for more information.
 
 ### `sbom_add_package`
@@ -251,8 +252,18 @@ sbom_add_package(
 - `SUPPLIER`: Supplier of the package.
   - One of the `<PERSON|ORGANIZATION>` keywords must be provided.
   - `EMAIL` is optional.
-- `RELATIONSHIP`: Defaults to `${Project} DEPENDS_ON <name>`.
+- `RELATIONSHIP`:
+  - Defaults to `<project_id> DEPENDS_ON <id>`.
+    - `<project_id>` and `<id>`are placeholders for the SPDX identifiers that are automatically generated.
   - Use this argument to override the default relationship. See [SPDX clause 11](https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/) for more information.
+  - Eg: In the example above, the dependency `cxxopts` is only used by the `cli` and not the entire package.  The relationship can be overridden as follows:
+  ```cmake
+  sbom_add_target(cli)
+  set(cli_spdxid ${SBOM_LAST_SPDXID})
+  sbom_add_package(cxxopts ... RELATIONSHIP "${cli_spdxid} DEPENDS_ON @SBOM_LAST_SPDXID@" )
+  ```
+  - - `${SBOM_LAST_SPDXID}` is set to the SPDX identifier of the last added file/package/target.
+    - `@SBOM_LAST_SPDXID@` is a placeholder for the SPDX identifier that will be generated for `cxxopts`.
 
 ### `sbom_add_external`
 
