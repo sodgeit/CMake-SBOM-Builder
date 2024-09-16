@@ -15,7 +15,7 @@ sbom_generate(
 	[PACKAGE_VERSION <version_string>]
 	[PACKAGE_FILENAME <filename>]
 	[PACKAGE_DOWNLOAD <NOASSERTION|NONE|<url>>]
-	[PACKAGE_URL <NOASSERTION|NONE|<url>>]xg
+	[PACKAGE_URL <NOASSERTION|NONE|<url>>]
 	[PACKAGE_COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
 	[PACKAGE_NOTES [SUMMARY <summary_text>]
 				   [DESCRIPTION <description_text>] ]
