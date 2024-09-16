@@ -786,8 +786,7 @@ macro(_sbom_builder_is_setup)
 	endif()
 endmacro()
 
-# Append a file to the SBOM. Use this after calling sbom_generate().
-function(_sbom_add_path PATH)
+function(_sbom_add_pkg_content PATH)
 	set(options OPTIONAL FILE DIR)
 	set(oneValueArgs SPDXID
 					 RELATIONSHIP
@@ -798,45 +797,45 @@ function(_sbom_add_path PATH)
 					 ATTRIBUTION
 					 )
 	set(multiValueArgs FILETYPE CHECKSUM LICENSE)
-	cmake_parse_arguments(_arg_add_path "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+	cmake_parse_arguments(_arg_add_pkg_content "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
 	_sbom_builder_is_setup()
 
-	if(_arg_add_path_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${_arg_add_path_UNPARSED_ARGUMENTS}")
+	if(_arg_add_pkg_content_UNPARSED_ARGUMENTS)
+		message(FATAL_ERROR "Unknown arguments: ${_arg_add_pkg_content_UNPARSED_ARGUMENTS}")
 	endif()
 
 	sbom_spdxid(
-		VARIABLE _arg_add_path_SPDXID
-		CHECK "${_arg_add_path_SPDXID}"
+		VARIABLE _arg_add_pkg_content_SPDXID
+		CHECK "${_arg_add_pkg_content_SPDXID}"
 		HINTS "SPDXRef-${PATH}"
 	)
-	set(SBOM_LAST_SPDXID "${_arg_add_path_SPDXID}" PARENT_SCOPE)
+	set(SBOM_LAST_SPDXID "${_arg_add_pkg_content_SPDXID}" PARENT_SCOPE)
 
 	set(_fields "")
 
-	set(_arg_add_path_LICENSE_DECLARED "NOASSERTION")
-	if(NOT DEFINED _arg_add_path_LICENSE)
+	set(_arg_add_pkg_content_LICENSE_DECLARED "NOASSERTION")
+	if(NOT DEFINED _arg_add_pkg_content_LICENSE)
 		get_property(_sbom_package_license GLOBAL PROPERTY sbom_package_license)
-		set(_arg_add_path_LICENSE "${_sbom_package_license}")
+		set(_arg_add_pkg_content_LICENSE "${_sbom_package_license}")
 	endif()
-	_sbom_parse_license("CONCLUDED;${_arg_add_path_LICENSE}" _arg_add_path_LICENSE_CONCLUDED _arg_add_path_LICENSE_DECLARED _arg_add_path_LICENSE_COMMENT)
-	string(APPEND _fields "\nLicenseConcluded: ${_arg_add_path_LICENSE_CONCLUDED}")
-	if(DEFINED _arg_add_path_LICENSE_COMMENT)
-		string(APPEND _fields "\nLicenseComments: ${_arg_add_path_LICENSE_COMMENT}")
+	_sbom_parse_license("CONCLUDED;${_arg_add_pkg_content_LICENSE}" _arg_add_pkg_content_LICENSE_CONCLUDED _arg_add_pkg_content_LICENSE_DECLARED _arg_add_pkg_content_LICENSE_COMMENT)
+	string(APPEND _fields "\nLicenseConcluded: ${_arg_add_pkg_content_LICENSE_CONCLUDED}")
+	if(DEFINED _arg_add_pkg_content_LICENSE_COMMENT)
+		string(APPEND _fields "\nLicenseComments: ${_arg_add_pkg_content_LICENSE_COMMENT}")
 	endif()
 
-	if(DEFINED _arg_add_path_FILETYPE)
-		_sbom_parse_filetype("${_arg_add_path_FILETYPE}" _arg_add_path_FILETYPE)
-		foreach(_filetype ${_arg_add_path_FILETYPE})
+	if(DEFINED _arg_add_pkg_content_FILETYPE)
+		_sbom_parse_filetype("${_arg_add_pkg_content_FILETYPE}" _arg_add_pkg_content_FILETYPE)
+		foreach(_filetype ${_arg_add_pkg_content_FILETYPE})
 			string(APPEND _fields "\nFileType: ${_filetype}")
 		endforeach()
 	endif()
 
-	if(DEFINED _arg_add_path_CHECKSUM)
+	if(DEFINED _arg_add_pkg_content_CHECKSUM)
 		set(_hash_algo "SHA1;SHA256") # SHA1 is always required by SPDX, SHA256 required by TR-03183
 		set(_supported_algorithms "MD5;SHA224;SHA384;SHA512;SHA3-256;SHA3-384;SHA3-512")
-		foreach(_checksum ${_arg_add_path_CHECKSUM})
+		foreach(_checksum ${_arg_add_pkg_content_CHECKSUM})
 			if("${_checksum}" IN_LIST _supported_algorithms)
 				list(APPEND _hash_algo "${_checksum}")
 			else()
@@ -845,50 +844,50 @@ function(_sbom_add_path PATH)
 		endforeach()
 	endif()
 
-	if(NOT DEFINED _arg_add_path_COPYRIGHT)
+	if(NOT DEFINED _arg_add_pkg_content_COPYRIGHT)
 		get_property(_sbom_package_copyright GLOBAL PROPERTY sbom_package_copyright)
-		set(_arg_add_path_COPYRIGHT "${_sbom_package_copyright}")
+		set(_arg_add_pkg_content_COPYRIGHT "${_sbom_package_copyright}")
 	endif()
-	string(APPEND _fields "\nFileCopyrightText: ${_arg_add_path_COPYRIGHT}")
+	string(APPEND _fields "\nFileCopyrightText: ${_arg_add_pkg_content_COPYRIGHT}")
 
-	if(DEFINED _arg_add_path_COMMENT)
-		string(APPEND _fields "\nComment: ${_arg_add_path_COMMENT}")
-	endif()
-
-	if(DEFINED _arg_add_path_NOTICE)
-		string(APPEND _fields "\nFileNotice: ${_arg_add_path_NOTICE}")
+	if(DEFINED _arg_add_pkg_content_COMMENT)
+		string(APPEND _fields "\nComment: ${_arg_add_pkg_content_COMMENT}")
 	endif()
 
-	if(DEFINED _arg_add_path_CONTRIBUTORS)
-		foreach(_contributor ${_arg_add_path_CONTRIBUTORS})
+	if(DEFINED _arg_add_pkg_content_NOTICE)
+		string(APPEND _fields "\nFileNotice: ${_arg_add_pkg_content_NOTICE}")
+	endif()
+
+	if(DEFINED _arg_add_pkg_content_CONTRIBUTORS)
+		foreach(_contributor ${_arg_add_pkg_content_CONTRIBUTORS})
 			string(APPEND _fields "\nFileContributor: ${_contributor}")
 		endforeach()
 	endif()
 
-	if(DEFINED _arg_add_path_ATTRIBUTION)
-		foreach(_attribution ${_arg_add_path_ATTRIBUTION})
+	if(DEFINED _arg_add_pkg_content_ATTRIBUTION)
+		foreach(_attribution ${_arg_add_pkg_content_ATTRIBUTION})
 			string(APPEND _fields "\nFileAttributionText: ${_attribution}")
 		endforeach()
 	endif()
 
-	if(NOT DEFINED _arg_add_path_RELATIONSHIP)
-		set(_arg_add_path_RELATIONSHIP "SPDXRef-${_sbom_project} CONTAINS ${_arg_add_path_SPDXID}")
+	if(NOT DEFINED _arg_add_pkg_content_RELATIONSHIP)
+		set(_arg_add_pkg_content_RELATIONSHIP "SPDXRef-${_sbom_project} CONTAINS ${_arg_add_pkg_content_SPDXID}")
 	else()
-		string(REPLACE "@SBOM_LAST_SPDXID@" "${_arg_add_path_SPDXID}" _arg_add_path_RELATIONSHIP "${_arg_add_path_RELATIONSHIP}")
+		string(REPLACE "@SBOM_LAST_SPDXID@" "${_arg_add_pkg_content_SPDXID}" _arg_add_pkg_content_RELATIONSHIP "${_arg_add_pkg_content_RELATIONSHIP}")
 	endif()
 
 	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 
-	_sbom_append_sbom_snippet("${_arg_add_path_SPDXID}.cmake")
+	_sbom_append_sbom_snippet("${_arg_add_pkg_content_SPDXID}.cmake")
 	file(
 		GENERATE
-		OUTPUT ${_sbom_snippet_dir}/${_arg_add_path_SPDXID}.cmake
+		OUTPUT ${_sbom_snippet_dir}/${_arg_add_pkg_content_SPDXID}.cmake
 		CONTENT
 		"
 cmake_policy(SET CMP0011 NEW)
 cmake_policy(SET CMP0012 NEW)
 
-set(ADDING_DIR ${_arg_add_path_DIR})
+set(ADDING_DIR ${_arg_add_pkg_content_DIR})
 
 set(_files \"\")
 if(NOT ADDING_DIR)
@@ -901,17 +900,17 @@ else()
 endif()
 
 if((NOT ADDING_DIR) AND (NOT EXISTS \${CMAKE_INSTALL_PREFIX}/${PATH}))
-	if(NOT ${_arg_add_path_OPTIONAL})
+	if(NOT ${_arg_add_pkg_content_OPTIONAL})
 		message(FATAL_ERROR \"Cannot find ./${PATH}\")
 	endif()
 else()
 	set(_count 0)
-	set(_rel \"${_arg_add_path_RELATIONSHIP}\")
-	set(_id \"${_arg_add_path_SPDXID}\")
+	set(_rel \"${_arg_add_pkg_content_RELATIONSHIP}\")
+	set(_id \"${_arg_add_pkg_content_SPDXID}\")
 	foreach(_f IN LISTS _files)
 		if(ADDING_DIR)
-			set(_rel \"${_arg_add_path_RELATIONSHIP}-\${_count}\")
-			set(_id \"${_arg_add_path_SPDXID}-\${_count}\")
+			set(_rel \"${_arg_add_pkg_content_RELATIONSHIP}-\${_count}\")
+			set(_id \"${_arg_add_pkg_content_SPDXID}-\${_count}\")
 			math(EXPR _count \"\${_count} + 1\")
 		endif()
 		set(_checksum_fields \"\")
@@ -940,12 +939,12 @@ endif()
 endfunction()
 
 function(sbom_add_directory DIR_PATH)
-	_sbom_add_path("${DIR_PATH}" "DIR" "${ARGN}")
+	_sbom_add_pkg_content("${DIR_PATH}" "DIR" "${ARGN}")
 	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
 endfunction()
 
 function(sbom_add_file FILENAME)
-	_sbom_add_path("${FILENAME}" "${ARGN}")
+	_sbom_add_pkg_content("${FILENAME}" "${ARGN}")
 	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
 endfunction()
 
