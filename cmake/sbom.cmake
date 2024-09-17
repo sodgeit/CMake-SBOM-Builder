@@ -329,41 +329,41 @@ macro(_sbom_generate_document_template)
 	set(_pkg_supplier_field "")
 	set(_pkg_copyright_field "")
 
-	if(DEFINED SBOM_GENERATE_CREATOR_PERSON)
-		set(_pkg_creator_name "${SBOM_GENERATE_CREATOR_PERSON}")
+	if(DEFINED _arg_sbom_gen_CREATOR_PERSON)
+		set(_pkg_creator_name "${_arg_sbom_gen_CREATOR_PERSON}")
 		set(_pkg_creator_field "Creator: Person: ${_pkg_creator_name}")
 		set(_pkg_supplier_field "PackageSupplier: Person: ${_pkg_creator_name}")
-	elseif(DEFINED SBOM_GENERATE_CREATOR_ORGANIZATION)
-		set(_pkg_creator_name "${SBOM_GENERATE_CREATOR_ORGANIZATION}")
+	elseif(DEFINED _arg_sbom_gen_CREATOR_ORGANIZATION)
+		set(_pkg_creator_name "${_arg_sbom_gen_CREATOR_ORGANIZATION}")
 		set(_pkg_creator_field "Creator: Organization: ${_pkg_creator_name}")
 		set(_pkg_supplier_field "PackageSupplier: Organization: ${_pkg_creator_name}")
 	endif()
-	if(DEFINED SBOM_GENERATE_CREATOR_EMAIL)
-		set(_pkg_creator_field "${_pkg_creator_field} (${SBOM_GENERATE_CREATOR_EMAIL})")
-		set(_pkg_supplier_field "${_pkg_supplier_field} (${SBOM_GENERATE_CREATOR_EMAIL})")
+	if(DEFINED _arg_sbom_gen_CREATOR_EMAIL)
+		set(_pkg_creator_field "${_pkg_creator_field} (${_arg_sbom_gen_CREATOR_EMAIL})")
+		set(_pkg_supplier_field "${_pkg_supplier_field} (${_arg_sbom_gen_CREATOR_EMAIL})")
 	endif()
 
-	if(DEFINED SBOM_GENERATE_PACKAGE_COPYRIGHT)
-		set(_pkg_copyright_field "PackageCopyrightText: ${SBOM_GENERATE_PACKAGE_COPYRIGHT}")
+	if(DEFINED _arg_sbom_gen_PACKAGE_COPYRIGHT)
+		set(_pkg_copyright_field "PackageCopyrightText: ${_arg_sbom_gen_PACKAGE_COPYRIGHT}")
 	endif()
 
 	set(_pkg_summary_field FALSE)
 	set(_pkg_desc_field FALSE)
-	if(DEFINED SBOM_GENERATE_PACKAGE_SUMMARY)
+	if(DEFINED _arg_sbom_gen_PACKAGE_SUMMARY)
 		set(_pkg_summary_field TRUE)
-		set(_pkg_summary_field_txt "PackageSummary: <text$<ANGLE-R>${SBOM_GENERATE_PACKAGE_SUMMARY}</text$<ANGLE-R>")
+		set(_pkg_summary_field_txt "PackageSummary: <text$<ANGLE-R>${_arg_sbom_gen_PACKAGE_SUMMARY}</text$<ANGLE-R>")
 	endif()
 
-	if(DEFINED SBOM_GENERATE_PACKAGE_DESC)
+	if(DEFINED _arg_sbom_gen_PACKAGE_DESC)
 		set(_pkg_desc_field TRUE)
-		set(_pkg_desc_field_txt "PackageDescription: <text$<ANGLE-R>${SBOM_GENERATE_PACKAGE_DESC}</text$<ANGLE-R>")
+		set(_pkg_desc_field_txt "PackageDescription: <text$<ANGLE-R>${_arg_sbom_gen_PACKAGE_DESC}</text$<ANGLE-R>")
 	endif()
 
 	set(_pkg_purpose_fields FALSE)
-	if(DEFINED SBOM_GENERATE_PACKAGE_PURPOSE)
+	if(DEFINED _arg_sbom_gen_PACKAGE_PURPOSE)
 		set(_pkg_purpose_fields TRUE)
 		set(_pkg_purpose_field_txt "")
-		foreach(_purpose IN LISTS SBOM_GENERATE_PACKAGE_PURPOSE)
+		foreach(_purpose IN LISTS _arg_sbom_gen_PACKAGE_PURPOSE)
 			set(_pkg_purpose_field_txt "${_pkg_purpose_field_txt}\nPrimaryPackagePurpose: ${_purpose}")
 		endforeach()
 	endif()
@@ -376,7 +376,7 @@ macro(_sbom_generate_document_template)
 DataLicense: CC0-1.0
 SPDXID: SPDXRef-DOCUMENT
 DocumentName: ${doc_name}
-DocumentNamespace: ${SBOM_GENERATE_NAMESPACE}\
+DocumentNamespace: ${_arg_sbom_gen_NAMESPACE}\
 $<$<BOOL:${_pkg_creator_field}>:\n${_pkg_creator_field}>
 Creator: Tool: CMake-SBOM-Builder-${SBOM_BUILDER_VERSION}
 CreatorComment: <text>This SPDX document was created from CMake ${CMAKE_VERSION}, using CMake-SBOM-Builder from https://github.com/sodgeit/CMake-SBOM-Builder</text>
@@ -394,21 +394,21 @@ FilesAnalyzed: false
 PackageSummary: <text>The compiler as identified by CMake, running on ${CMAKE_HOST_SYSTEM_NAME} (${CMAKE_HOST_SYSTEM_PROCESSOR})</text>
 PrimaryPackagePurpose: APPLICATION
 Relationship: SPDXRef-compiler CONTAINS NOASSERTION
-Relationship: SPDXRef-compiler BUILD_DEPENDENCY_OF SPDXRef-${SBOM_GENERATE_PACKAGE_NAME}
-RelationshipComment: <text>SPDXRef-${SBOM_GENERATE_PACKAGE_NAME} is built by compiler ${CMAKE_CXX_COMPILER_ID} (${CMAKE_CXX_COMPILER}) version ${CMAKE_CXX_COMPILER_VERSION}</text>
+Relationship: SPDXRef-compiler BUILD_DEPENDENCY_OF SPDXRef-${_arg_sbom_gen_PACKAGE_NAME}
+RelationshipComment: <text>SPDXRef-${_arg_sbom_gen_PACKAGE_NAME} is built by compiler ${CMAKE_CXX_COMPILER_ID} (${CMAKE_CXX_COMPILER}) version ${CMAKE_CXX_COMPILER_VERSION}</text>
 
-PackageName: ${SBOM_GENERATE_PACKAGE_NAME}
-SPDXID: SPDXRef-${SBOM_GENERATE_PACKAGE_NAME}
+PackageName: ${_arg_sbom_gen_PACKAGE_NAME}
+SPDXID: SPDXRef-${_arg_sbom_gen_PACKAGE_NAME}
 ExternalRef: SECURITY cpe23Type ${SBOM_CPE}
-ExternalRef: PACKAGE-MANAGER purl pkg:supplier/${_pkg_creator_name}/${SBOM_GENERATE_PACKAGE_NAME}@${SBOM_GENERATE_PACKAGE_VERSION}
-PackageVersion: ${SBOM_GENERATE_PACKAGE_VERSION}
-PackageFileName: ${SBOM_GENERATE_PACKAGE_FILENAME}\
+ExternalRef: PACKAGE-MANAGER purl pkg:supplier/${_pkg_creator_name}/${_arg_sbom_gen_PACKAGE_NAME}@${_arg_sbom_gen_PACKAGE_VERSION}
+PackageVersion: ${_arg_sbom_gen_PACKAGE_VERSION}
+PackageFileName: ${_arg_sbom_gen_PACKAGE_FILENAME}\
 $<$<BOOL:${_pkg_supplier_field}>:\n${_pkg_supplier_field}>
-PackageDownloadLocation: ${SBOM_GENERATE_PACKAGE_DOWNLOAD}
-PackageLicenseConcluded: ${SBOM_GENERATE_PACKAGE_LICENSE}
-PackageLicenseDeclared: ${SBOM_GENERATE_PACKAGE_LICENSE}\
+PackageDownloadLocation: ${_arg_sbom_gen_PACKAGE_DOWNLOAD}
+PackageLicenseConcluded: ${_arg_sbom_gen_PACKAGE_LICENSE}
+PackageLicenseDeclared: ${_arg_sbom_gen_PACKAGE_LICENSE}\
 $<$<BOOL:${_pkg_copyright_field}>:\n${_pkg_copyright_field}>
-PackageHomePage: ${SBOM_GENERATE_PACKAGE_URL}\
+PackageHomePage: ${_arg_sbom_gen_PACKAGE_URL}\
 $<$<BOOL:${_pkg_summary_field}>:\n${_pkg_summary_field_txt}>\
 $<$<BOOL:${_pkg_desc_field}>:\n${_pkg_desc_field_txt}>
 PackageComment: <text>Built by CMake ${CMAKE_VERSION} with $<CONFIG> configuration for ${CMAKE_SYSTEM_NAME} (${CMAKE_SYSTEM_PROCESSOR})</text>\
@@ -416,7 +416,7 @@ $<$<BOOL:${_pkg_purpose_fields}>:${_pkg_purpose_field_txt}>
 PackageVerificationCode: \${SBOM_VERIFICATION_CODE}
 BuiltDate: \${SBOM_CREATE_DATE}
 ReleaseDate: \${SBOM_CREATE_DATE}
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${SBOM_GENERATE_PACKAGE_NAME}
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-${_arg_sbom_gen_PACKAGE_NAME}
 "
 	)
 endmacro()
@@ -565,138 +565,138 @@ function(sbom_generate)
 	)
 	set(multiValueArgs CREATOR PACKAGE_NOTES PACKAGE_PURPOSE)
 	cmake_parse_arguments(
-		SBOM_GENERATE "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
+		_arg_sbom_gen "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
 	)
 
-	if(SBOM_GENERATE_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${SBOM_GENERATE_UNPARSED_ARGUMENTS}")
+	if(_arg_sbom_gen_UNPARSED_ARGUMENTS)
+		message(FATAL_ERROR "Unknown arguments: ${_arg_sbom_gen_UNPARSED_ARGUMENTS}")
 	endif()
 
 	if(NOT DEFINED GIT_VERSION)
 		version_extract()
 	endif()
 
-	if(NOT DEFINED SBOM_GENERATE_CREATOR)
+	if(NOT DEFINED _arg_sbom_gen_CREATOR)
 		message(FATAL_ERROR "Missing required argument CREATOR.")
 	endif()
 
-	cmake_parse_arguments(SBOM_GENERATE_CREATOR "" "PERSON;ORGANIZATION;EMAIL" "" ${SBOM_GENERATE_CREATOR})
-	if(SBOM_GENERATE_CREATOR_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown subarguments for CREATOR: ${SBOM_GENERATE_CREATOR_UNPARSED_ARGUMENTS}.")
+	cmake_parse_arguments(_arg_sbom_gen_CREATOR "" "PERSON;ORGANIZATION;EMAIL" "" ${_arg_sbom_gen_CREATOR})
+	if(_arg_sbom_gen_CREATOR_UNPARSED_ARGUMENTS)
+		message(FATAL_ERROR "Unknown subarguments for CREATOR: ${_arg_sbom_gen_CREATOR_UNPARSED_ARGUMENTS}.")
 	endif()
-	if((NOT DEFINED SBOM_GENERATE_CREATOR_PERSON) AND (NOT DEFINED SBOM_GENERATE_CREATOR_ORGANIZATION))
+	if((NOT DEFINED _arg_sbom_gen_CREATOR_PERSON) AND (NOT DEFINED _arg_sbom_gen_CREATOR_ORGANIZATION))
 		message(FATAL_ERROR "Missing <PERSON|ORGANIZATION> <name> for argument CREATOR.")
-	elseif(DEFINED SBOM_GENERATE_CREATOR_PERSON AND DEFINED SBOM_GENERATE_CREATOR_ORGANIZATION)
+	elseif(DEFINED _arg_sbom_gen_CREATOR_PERSON AND DEFINED _arg_sbom_gen_CREATOR_ORGANIZATION)
 		message(FATAL_ERROR "Specify either PERSON or ORGANIZATION, not both.")
 	endif()
 
-	if(NOT DEFINED SBOM_GENERATE_PACKAGE_LICENSE)
+	if(NOT DEFINED _arg_sbom_gen_PACKAGE_LICENSE)
 		message(FATAL_ERROR "Missing required argument PACKAGE_LICENSE.")
 	endif()
 
-	if(NOT DEFINED SBOM_GENERATE_PACKAGE_NAME)
-		set(SBOM_GENERATE_PACKAGE_NAME ${PROJECT_NAME})
+	if(NOT DEFINED _arg_sbom_gen_PACKAGE_NAME)
+		set(_arg_sbom_gen_PACKAGE_NAME ${PROJECT_NAME})
 	endif()
 
-	if(NOT DEFINED SBOM_GENERATE_PACKAGE_VERSION)
-		set(SBOM_GENERATE_PACKAGE_VERSION ${GIT_VERSION})
+	if(NOT DEFINED _arg_sbom_gen_PACKAGE_VERSION)
+		set(_arg_sbom_gen_PACKAGE_VERSION ${GIT_VERSION})
 	endif()
 
-	if(NOT DEFINED SBOM_GENERATE_PACKAGE_FILENAME)
-		set(SBOM_GENERATE_PACKAGE_FILENAME "${SBOM_GENERATE_PACKAGE_NAME}-${SBOM_GENERATE_PACKAGE_VERSION}.zip")
+	if(NOT DEFINED _arg_sbom_gen_PACKAGE_FILENAME)
+		set(_arg_sbom_gen_PACKAGE_FILENAME "${_arg_sbom_gen_PACKAGE_NAME}-${_arg_sbom_gen_PACKAGE_VERSION}.zip")
 	endif()
 
-	if(NOT DEFINED SBOM_GENERATE_PACKAGE_DOWNLOAD)
+	if(NOT DEFINED _arg_sbom_gen_PACKAGE_DOWNLOAD)
 		# if not defined, the creator made no attempt to specify a download location
-		set(SBOM_GENERATE_PACKAGE_DOWNLOAD "NOASSERTION")
+		set(_arg_sbom_gen_PACKAGE_DOWNLOAD "NOASSERTION")
 	else()
-		cmake_parse_arguments(SBOM_GENERATE_PACKAGE_DOWNLOAD "NONE;NOASSERTION" "" "" ${SBOM_GENERATE_PACKAGE_DOWNLOAD})
-		if(SBOM_GENERATE_PACKAGE_DOWNLOAD_NONE)
-			set(SBOM_GENERATE_PACKAGE_DOWNLOAD "NONE")
-		elseif(SBOM_GENERATE_PACKAGE_DOWNLOAD_NOASSERTION)
-			set(SBOM_GENERATE_PACKAGE_DOWNLOAD "NOASSERTION")
+		cmake_parse_arguments(_arg_sbom_gen_PACKAGE_DOWNLOAD "NONE;NOASSERTION" "" "" ${_arg_sbom_gen_PACKAGE_DOWNLOAD})
+		if(_arg_sbom_gen_PACKAGE_DOWNLOAD_NONE)
+			set(_arg_sbom_gen_PACKAGE_DOWNLOAD "NONE")
+		elseif(_arg_sbom_gen_PACKAGE_DOWNLOAD_NOASSERTION)
+			set(_arg_sbom_gen_PACKAGE_DOWNLOAD "NOASSERTION")
 		endif()
 	endif()
 
-	if(NOT DEFINED SBOM_GENERATE_PACKAGE_URL)
-		if(NOT DEFINED SBOM_GENERATE_NAMESPACE)
+	if(NOT DEFINED _arg_sbom_gen_PACKAGE_URL)
+		if(NOT DEFINED _arg_sbom_gen_NAMESPACE)
 			message(FATAL_ERROR "Specify NAMESPACE when PACKAGE_URL is omitted.")
 		endif()
 	endif()
 
 	string(TIMESTAMP NOW_UTC UTC)
 
-	if(NOT DEFINED SBOM_GENERATE_PACKAGE_COPYRIGHT)
+	if(NOT DEFINED _arg_sbom_gen_PACKAGE_COPYRIGHT)
 		string(TIMESTAMP NOW_YEAR "%Y" UTC)
 
-		if(DEFINED SBOM_GENERATE_CREATOR_PERSON)
-			set(SBOM_GENERATE_PACKAGE_COPYRIGHT "${NOW_YEAR} ${SBOM_GENERATE_CREATOR_PERSON}")
-		elseif(DEFINED SBOM_GENERATE_CREATOR_ORGANIZATION)
-			set(SBOM_GENERATE_PACKAGE_COPYRIGHT "${NOW_YEAR} ${SBOM_GENERATE_CREATOR_ORGANIZATION}")
+		if(DEFINED _arg_sbom_gen_CREATOR_PERSON)
+			set(_arg_sbom_gen_PACKAGE_COPYRIGHT "${NOW_YEAR} ${_arg_sbom_gen_CREATOR_PERSON}")
+		elseif(DEFINED _arg_sbom_gen_CREATOR_ORGANIZATION)
+			set(_arg_sbom_gen_PACKAGE_COPYRIGHT "${NOW_YEAR} ${_arg_sbom_gen_CREATOR_ORGANIZATION}")
 		else()
-			set(SBOM_GENERATE_PACKAGE_COPYRIGHT "NOASSERTION")
+			set(_arg_sbom_gen_PACKAGE_COPYRIGHT "NOASSERTION")
 		endif()
 	else()
-		cmake_parse_arguments(SBOM_GENERATE_PACKAGE_COPYRIGHT "NONE;NOASSERTION" "" "" ${SBOM_GENERATE_PACKAGE_COPYRIGHT})
-		if(SBOM_GENERATE_PACKAGE_COPYRIGHT_NONE)
-			set(SBOM_GENERATE_PACKAGE_COPYRIGHT "NONE")
-		elseif(SBOM_GENERATE_PACKAGE_COPYRIGHT_NOASSERTION)
-			set(SBOM_GENERATE_PACKAGE_COPYRIGHT "NOASSERTION")
+		cmake_parse_arguments(_arg_sbom_gen_PACKAGE_COPYRIGHT "NONE;NOASSERTION" "" "" ${_arg_sbom_gen_PACKAGE_COPYRIGHT})
+		if(_arg_sbom_gen_PACKAGE_COPYRIGHT_NONE)
+			set(_arg_sbom_gen_PACKAGE_COPYRIGHT "NONE")
+		elseif(_arg_sbom_gen_PACKAGE_COPYRIGHT_NOASSERTION)
+			set(_arg_sbom_gen_PACKAGE_COPYRIGHT "NOASSERTION")
 		endif()
 	endif()
 
-	if(DEFINED SBOM_GENERATE_PACKAGE_NOTES)
-		_sbom_parse_package_notes("${SBOM_GENERATE_PACKAGE_NOTES}" SBOM_GENERATE_PACKAGE_SUMMARY
-																   SBOM_GENERATE_PACKAGE_DESC
+	if(DEFINED _arg_sbom_gen_PACKAGE_NOTES)
+		_sbom_parse_package_notes("${_arg_sbom_gen_PACKAGE_NOTES}" _arg_sbom_gen_PACKAGE_SUMMARY
+																   _arg_sbom_gen_PACKAGE_DESC
 																   __unused__)
 		unset(__unused__)
 	endif()
 
-	if(DEFINED SBOM_GENERATE_PACKAGE_PURPOSE)
-		_sbom_parse_package_purpose("${SBOM_GENERATE_PACKAGE_PURPOSE}" SBOM_GENERATE_PACKAGE_PURPOSE)
+	if(DEFINED _arg_sbom_gen_PACKAGE_PURPOSE)
+		_sbom_parse_package_purpose("${_arg_sbom_gen_PACKAGE_PURPOSE}" _arg_sbom_gen_PACKAGE_PURPOSE)
 	endif()
 
-	if(NOT DEFINED SBOM_GENERATE_OUTPUT)
-		set(SBOM_GENERATE_OUTPUT "./${CMAKE_INSTALL_DATAROOTDIR}/${SBOM_GENERATE_PACKAGE_NAME}-sbom-${GIT_VERSION_PATH}.spdx")
+	if(NOT DEFINED _arg_sbom_gen_OUTPUT)
+		set(_arg_sbom_gen_OUTPUT "./${CMAKE_INSTALL_DATAROOTDIR}/${_arg_sbom_gen_PACKAGE_NAME}-sbom-${GIT_VERSION_PATH}.spdx")
 	endif()
 
-	if(NOT DEFINED SBOM_GENERATE_NAMESPACE)
-		if((NOT DEFINED SBOM_GENERATE_PACKAGE_URL) OR (SBOM_GENERATE_PACKAGE_URL STREQUAL "NONE") OR (SBOM_GENERATE_PACKAGE_URL STREQUAL "NOASSERTION"))
+	if(NOT DEFINED _arg_sbom_gen_NAMESPACE)
+		if((NOT DEFINED _arg_sbom_gen_PACKAGE_URL) OR (_arg_sbom_gen_PACKAGE_URL STREQUAL "NONE") OR (_arg_sbom_gen_PACKAGE_URL STREQUAL "NOASSERTION"))
 			message(FATAL_ERROR "Specifiy PACKAGE_URL <url> when NAMESPACE is omitted.")
 		endif()
-		set(SBOM_GENERATE_NAMESPACE "${SBOM_GENERATE_PACKAGE_URL}/spdxdocs/${SBOM_GENERATE_PACKAGE_NAME}-${SBOM_GENERATE_PACKAGE_VERSION}")
+		set(_arg_sbom_gen_NAMESPACE "${_arg_sbom_gen_PACKAGE_URL}/spdxdocs/${_arg_sbom_gen_PACKAGE_NAME}-${_arg_sbom_gen_PACKAGE_VERSION}")
 	endif()
 
-	if(${SBOM_GENERATE_ENABLE_CHECKS})
+	if(${_arg_sbom_gen_ENABLE_CHECKS})
 		set(SBOM_CHECKS_ENABLED ON CACHE BOOL "Warn on important missing fields.")
 	else()
 		set(SBOM_CHECKS_ENABLED OFF CACHE BOOL "Warn on important missing fields.")
 	endif()
 
 	# remove special characters from package name and replace with -
-	string(REGEX REPLACE "[^A-Za-z0-9.]+" "-" SBOM_GENERATE_PACKAGE_NAME "${SBOM_GENERATE_PACKAGE_NAME}")
+	string(REGEX REPLACE "[^A-Za-z0-9.]+" "-" _arg_sbom_gen_PACKAGE_NAME "${_arg_sbom_gen_PACKAGE_NAME}")
 	# strip - from end of string
-	string(REGEX REPLACE "-+$" "" SBOM_GENERATE_PACKAGE_NAME "${SBOM_GENERATE_PACKAGE_NAME}")
+	string(REGEX REPLACE "-+$" "" _arg_sbom_gen_PACKAGE_NAME "${_arg_sbom_gen_PACKAGE_NAME}")
 
 	# Prevent collision with other generated SPDXID with -[0-9]+ suffix, by removing -.
-	string(REGEX REPLACE "-([0-9]+)$" "\\1" SBOM_GENERATE_PACKAGE_NAME "${SBOM_GENERATE_PACKAGE_NAME}")
+	string(REGEX REPLACE "-([0-9]+)$" "\\1" _arg_sbom_gen_PACKAGE_NAME "${_arg_sbom_gen_PACKAGE_NAME}")
 
-	set(SBOM_FILENAME "${SBOM_GENERATE_OUTPUT}" PARENT_SCOPE)
+	set(SBOM_FILENAME "${_arg_sbom_gen_OUTPUT}" PARENT_SCOPE)
 	set(SBOM_BINARY_DIR "${PROJECT_BINARY_DIR}/sbom")
 	set(SBOM_SNIPPET_DIR "${SBOM_BINARY_DIR}/sbom-src/$<CONFIG>")
-	set_property(GLOBAL PROPERTY SBOM_FILENAME "${SBOM_GENERATE_OUTPUT}")
+	set_property(GLOBAL PROPERTY SBOM_FILENAME "${_arg_sbom_gen_OUTPUT}")
 	set_property(GLOBAL PROPERTY SBOM_BINARY_DIR "${SBOM_BINARY_DIR}")
 	set_property(GLOBAL PROPERTY SBOM_SNIPPET_DIR "${SBOM_SNIPPET_DIR}")
-	set_property(GLOBAL PROPERTY sbom_package_spdxid "${SBOM_GENERATE_PACKAGE_NAME}")
-	set_property(GLOBAL PROPERTY sbom_package_license "${SBOM_GENERATE_PACKAGE_LICENSE}")
-	set_property(GLOBAL PROPERTY sbom_package_copyright "${SBOM_GENERATE_PACKAGE_COPYRIGHT}")
+	set_property(GLOBAL PROPERTY sbom_package_spdxid "${_arg_sbom_gen_PACKAGE_NAME}")
+	set_property(GLOBAL PROPERTY sbom_package_license "${_arg_sbom_gen_PACKAGE_LICENSE}")
+	set_property(GLOBAL PROPERTY sbom_package_copyright "${_arg_sbom_gen_PACKAGE_COPYRIGHT}")
 	set_property(GLOBAL PROPERTY sbom_spdxids 0)
 
 	#REFAC(>=3.20): Use cmake_path() instead of get_filename_component().
 	if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.20)
-		cmake_path(GET SBOM_GENERATE_OUTPUT FILENAME doc_name)
+		cmake_path(GET _arg_sbom_gen_OUTPUT FILENAME doc_name)
 	else()
-		get_filename_component(doc_name "${SBOM_GENERATE_OUTPUT}" NAME_WLE)
+		get_filename_component(doc_name "${_arg_sbom_gen_OUTPUT}" NAME_WLE)
 	endif()
 
 	file(MAKE_DIRECTORY ${SBOM_BINARY_DIR})
@@ -708,14 +708,14 @@ function(sbom_generate)
 
 	set(_sbom_intermediate_file "$<CONFIG>/sbom.spdx.in")
 	set(_sbom_document_template "SPDXRef-DOCUMENT.spdx.in")
-	set(_sbom_export_path "${SBOM_GENERATE_OUTPUT}")
+	set(_sbom_export_path "${_arg_sbom_gen_OUTPUT}")
 
-	if(NOT IS_ABSOLUTE "${SBOM_GENERATE_OUTPUT}")
-		set(_sbom_export_path "\${CMAKE_INSTALL_PREFIX}/${SBOM_GENERATE_OUTPUT}")
+	if(NOT IS_ABSOLUTE "${_arg_sbom_gen_OUTPUT}")
+		set(_sbom_export_path "\${CMAKE_INSTALL_PREFIX}/${_arg_sbom_gen_OUTPUT}")
 	endif()
 
 	_sbom_generate_document_template()
-	set(SBOM_LAST_SPDXID "SPDXRef-${SBOM_GENERATE_PACKAGE_NAME}" PARENT_SCOPE)
+	set(SBOM_LAST_SPDXID "SPDXRef-${_arg_sbom_gen_PACKAGE_NAME}" PARENT_SCOPE)
 
 	_sbom_append_sbom_snippet("setup.cmake")
 	file(GENERATE
@@ -1009,82 +1009,82 @@ function(sbom_add_package NAME)
 		DATE
 	)
 	cmake_parse_arguments(
-		_args "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
+		_arg_add_pkg "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
 	)
 
 	_sbom_builder_is_setup()
 
-	if(_args_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${_args_UNPARSED_ARGUMENTS}")
+	if(_arg_add_pkg_UNPARSED_ARGUMENTS)
+		message(FATAL_ERROR "Unknown arguments: ${_arg_add_pkg_UNPARSED_ARGUMENTS}")
 	endif()
 
 	sbom_spdxid(
-		VARIABLE _args_SPDXID
-		CHECK "${_args_SPDXID}"
+		VARIABLE _arg_add_pkg_SPDXID
+		CHECK "${_arg_add_pkg_SPDXID}"
 		HINTS "SPDXRef-${NAME}"
 	)
 
-	set(SBOM_LAST_SPDXID ${_args_SPDXID} PARENT_SCOPE)
+	set(SBOM_LAST_SPDXID ${_arg_add_pkg_SPDXID} PARENT_SCOPE)
 
-	set(_fields "PackageName: ${NAME}\nSPDXID: ${_args_SPDXID}")
+	set(_fields "PackageName: ${NAME}\nSPDXID: ${_arg_add_pkg_SPDXID}")
 
-	set(_args_LICENSE_DECLARED "NOASSERTION")
-	if(NOT DEFINED _args_LICENSE)
+	set(_arg_add_pkg_LICENSE_DECLARED "NOASSERTION")
+	if(NOT DEFINED _arg_add_pkg_LICENSE)
 		message(FATAL_ERROR "Missing LICENSE argument for package ${NAME}.")
 	endif()
-	_sbom_parse_license("CONCLUDED;${_args_LICENSE}" _args_LICENSE_CONCLUDED _args_LICENSE_DECLARED _args_LICENSE_COMMENT)
-	string(APPEND _fields "\nPackageLicenseConcluded: ${_args_LICENSE_CONCLUDED}\nPackageLicenseDeclared: ${_args_LICENSE_DECLARED}")
-	if(DEFINED _args_LICENSE_COMMENT)
-		string(APPEND _fields "\nPackageLicenseComments: ${_args_LICENSE_COMMENT}")
+	_sbom_parse_license("CONCLUDED;${_arg_add_pkg_LICENSE}" _arg_add_pkg_LICENSE_CONCLUDED _arg_add_pkg_LICENSE_DECLARED _arg_add_pkg_LICENSE_COMMENT)
+	string(APPEND _fields "\nPackageLicenseConcluded: ${_arg_add_pkg_LICENSE_CONCLUDED}\nPackageLicenseDeclared: ${_arg_add_pkg_LICENSE_DECLARED}")
+	if(DEFINED _arg_add_pkg_LICENSE_COMMENT)
+		string(APPEND _fields "\nPackageLicenseComments: ${_arg_add_pkg_LICENSE_COMMENT}")
 	endif()
 
-	if(NOT DEFINED _args_VERSION)
+	if(NOT DEFINED _arg_add_pkg_VERSION)
 		message(FATAL_ERROR "Missing VERSION argument for package ${NAME}.")
 	endif()
-	string(APPEND _fields "\nPackageVersion: ${_args_VERSION}")
+	string(APPEND _fields "\nPackageVersion: ${_arg_add_pkg_VERSION}")
 
-	if(NOT DEFINED _args_SUPPLIER)
+	if(NOT DEFINED _arg_add_pkg_SUPPLIER)
 		message(FATAL_ERROR "Missing SUPPLIER argument for package ${NAME}.")
 	endif()
 	set(_supplier_field_txt "")
-	_sbom_parse_package_supplier("${_args_SUPPLIER}" _args_SUPPLIER_TYPE _args_SUPPLIER_NAME _args_SUPPLIER_EMAIL)
-	if("${_args_SUPPLIER_TYPE}" STREQUAL "NOASSERTION")
+	_sbom_parse_package_supplier("${_arg_add_pkg_SUPPLIER}" _arg_add_pkg_SUPPLIER_TYPE _arg_add_pkg_SUPPLIER_NAME _arg_add_pkg_SUPPLIER_EMAIL)
+	if("${_arg_add_pkg_SUPPLIER_TYPE}" STREQUAL "NOASSERTION")
 		message(FATAL_ERROR "SUPPLIER must be a PERSON or ORGANIZATION.")
 	else()
-		set(_supplier_field_txt "PackageSupplier: ${_args_SUPPLIER_TYPE} ${_args_SUPPLIER_NAME}")
-		if(DEFINED _args_SUPPLIER_EMAIL)
-			set(_supplier_field_txt "${_supplier_field_txt} (${_args_SUPPLIER_EMAIL})")
+		set(_supplier_field_txt "PackageSupplier: ${_arg_add_pkg_SUPPLIER_TYPE} ${_arg_add_pkg_SUPPLIER_NAME}")
+		if(DEFINED _arg_add_pkg_SUPPLIER_EMAIL)
+			set(_supplier_field_txt "${_supplier_field_txt} (${_arg_add_pkg_SUPPLIER_EMAIL})")
 		endif()
 	endif()
 	string(APPEND _fields "\n${_supplier_field_txt}")
 
-	if(DEFINED _args_FILENAME)
-		string(APPEND _fields "\nPackageFileName: ${_args_FILENAME}")
+	if(DEFINED _arg_add_pkg_FILENAME)
+		string(APPEND _fields "\nPackageFileName: ${_arg_add_pkg_FILENAME}")
 	endif()
 
-	if(DEFINED _args_ORIGINATOR)
+	if(DEFINED _arg_add_pkg_ORIGINATOR)
 		set(_originator_field_txt "")
-		_sbom_parse_package_supplier("${_args_ORIGINATOR}" _args_ORIGINATOR_TYPE _args_ORIGINATOR_NAME _args_ORIGINATOR_EMAIL)
-		if("${_args_ORIGINATOR_TYPE}" STREQUAL "NOASSERTION")
+		_sbom_parse_package_supplier("${_arg_add_pkg_ORIGINATOR}" _arg_add_pkg_ORIGINATOR_TYPE _arg_add_pkg_ORIGINATOR_NAME _arg_add_pkg_ORIGINATOR_EMAIL)
+		if("${_arg_add_pkg_ORIGINATOR_TYPE}" STREQUAL "NOASSERTION")
 			set(_originator_field_txt "PackageOriginator: NOASSERTION")
 		else()
-			set(_originator_field_txt "PackageOriginator: ${_args_ORIGINATOR_TYPE} ${_args_ORIGINATOR_NAME}")
-			if(DEFINED _args_ORIGINATOR_EMAIL)
-				set(_originator_field_txt "${_originator_field_txt} (${_args_ORIGINATOR_EMAIL})")
+			set(_originator_field_txt "PackageOriginator: ${_arg_add_pkg_ORIGINATOR_TYPE} ${_arg_add_pkg_ORIGINATOR_NAME}")
+			if(DEFINED _arg_add_pkg_ORIGINATOR_EMAIL)
+				set(_originator_field_txt "${_originator_field_txt} (${_arg_add_pkg_ORIGINATOR_EMAIL})")
 			endif()
 		endif()
 		string(APPEND _fields "\n${_originator_field_txt}")
 	endif()
 
-	if(NOT DEFINED _args_DOWNLOAD)
-		set(_args_DOWNLOAD "NOASSERTION")
+	if(NOT DEFINED _arg_add_pkg_DOWNLOAD)
+		set(_arg_add_pkg_DOWNLOAD "NOASSERTION")
 	endif()
-	string(APPEND _fields "\nPackageDownloadLocation: ${_args_DOWNLOAD}")
+	string(APPEND _fields "\nPackageDownloadLocation: ${_arg_add_pkg_DOWNLOAD}")
 
-	if(DEFINED _args_CHECKSUM)
+	if(DEFINED _arg_add_pkg_CHECKSUM)
 		set(_algo TRUE) #first string is the algorithm, second is the checksum
 		set(_checksum_field_txt "")
-		foreach(_checksum IN LISTS _args_CHECKSUM)
+		foreach(_checksum IN LISTS _arg_add_pkg_CHECKSUM)
 			if(_algo)
 				set(_algo FALSE)
 				set(_checksum_field_txt "${_checksum_field_txt}\nPackageChecksum: ${_checksum}:")
@@ -1096,75 +1096,75 @@ function(sbom_add_package NAME)
 		string(APPEND _fields "${_checksum_field_txt}")
 	endif()
 
-	if(DEFINED _args_URL)
-		string(APPEND _fields "\nPackageHomePage: ${_args_URL}")
+	if(DEFINED _arg_add_pkg_URL)
+		string(APPEND _fields "\nPackageHomePage: ${_arg_add_pkg_URL}")
 	endif()
 
-	if(DEFINED _args_SOURCE_INFO)
-		string(APPEND _fields "\nPackageSourceInfo: ${_args_URL}")
+	if(DEFINED _arg_add_pkg_SOURCE_INFO)
+		string(APPEND _fields "\nPackageSourceInfo: ${_arg_add_pkg_URL}")
 	endif()
 
-	if(NOT DEFINED _args_COPYRIGHT)
-		set(_args_COPYRIGHT "NOASSERTION")
+	if(NOT DEFINED _arg_add_pkg_COPYRIGHT)
+		set(_arg_add_pkg_COPYRIGHT "NOASSERTION")
 	endif()
-	string(APPEND _fields "\nPackageCopyrightText: ${_args_COPYRIGHT}")
+	string(APPEND _fields "\nPackageCopyrightText: ${_arg_add_pkg_COPYRIGHT}")
 
-	if(DEFINED _args_NOTES)
-		_sbom_parse_package_notes("${_args_NOTES}" _args_SUMMARY _args_DESC _args_COMMENT)
-		if(DEFINED _args_SUMMARY)
-			string(APPEND _fields "\nPackageSummary: <text>${_args_SUMMARY}</text>")
+	if(DEFINED _arg_add_pkg_NOTES)
+		_sbom_parse_package_notes("${_arg_add_pkg_NOTES}" _arg_add_pkg_SUMMARY _arg_add_pkg_DESC _arg_add_pkg_COMMENT)
+		if(DEFINED _arg_add_pkg_SUMMARY)
+			string(APPEND _fields "\nPackageSummary: <text>${_arg_add_pkg_SUMMARY}</text>")
 		endif()
-		if(DEFINED _args_DESC)
-			string(APPEND _fields "\nPackageDescription: <text>${_args_DESC}</text>")
+		if(DEFINED _arg_add_pkg_DESC)
+			string(APPEND _fields "\nPackageDescription: <text>${_arg_add_pkg_DESC}</text>")
 		endif()
-		if(DEFINED _args_COMMENT)
-			string(APPEND _fields "\nPackageComment: <text>${_args_COMMENT}</text>")
+		if(DEFINED _arg_add_pkg_COMMENT)
+			string(APPEND _fields "\nPackageComment: <text>${_arg_add_pkg_COMMENT}</text>")
 		endif()
 	endif()
 
-	foreach(_ref IN LISTS _args_EXTREF)
+	foreach(_ref IN LISTS _arg_add_pkg_EXTREF)
 		string(APPEND _fields "\nExternalRef: ${_ref}")
 	endforeach()
 
-	if(DEFINED _args_ATTRIBUTION)
-		foreach(_attr IN LISTS _args_ATTRIBUTION)
+	if(DEFINED _arg_add_pkg_ATTRIBUTION)
+		foreach(_attr IN LISTS _arg_add_pkg_ATTRIBUTION)
 			string(APPEND _fields "\nPackageAttributionText: ${_attr}")
 		endforeach()
 	endif()
 
-	if(DEFINED _args_PURPOSE)
-		_sbom_parse_package_purpose("${_args_PURPOSE}" _args_PURPOSE)
-		foreach(_purpose IN LISTS _args_PURPOSE)
+	if(DEFINED _arg_add_pkg_PURPOSE)
+		_sbom_parse_package_purpose("${_arg_add_pkg_PURPOSE}" _arg_add_pkg_PURPOSE)
+		foreach(_purpose IN LISTS _arg_add_pkg_PURPOSE)
 			string(APPEND _fields "\nPrimaryPackagePurpose: ${_purpose}")
 		endforeach()
 	endif()
 
-	if(DEFINED _args_DATE)
-		_sbom_parse_dates("${_args_DATE}" _args_date_Build _args_date_Rel _args_date_VU)
-		if(DEFINED _args_date_Build)
-			string(APPEND _fields "\nBuildDate: ${_args_date_Build}")
+	if(DEFINED _arg_add_pkg_DATE)
+		_sbom_parse_dates("${_arg_add_pkg_DATE}" _arg_add_pkg_date_Build _arg_add_pkg_date_Rel _arg_add_pkg_date_VU)
+		if(DEFINED _arg_add_pkg_date_Build)
+			string(APPEND _fields "\nBuildDate: ${_arg_add_pkg_date_Build}")
 		endif()
-		if(DEFINED _args_date_Rel)
-			string(APPEND _fields "\nReleaseDate: ${_args_date_Rel}")
+		if(DEFINED _arg_add_pkg_date_Rel)
+			string(APPEND _fields "\nReleaseDate: ${_arg_add_pkg_date_Rel}")
 		endif()
-		if(DEFINED _args_date_VU)
-			string(APPEND _fields "\nValidUntilDate: ${_args_date_VU}")
+		if(DEFINED _arg_add_pkg_date_VU)
+			string(APPEND _fields "\nValidUntilDate: ${_arg_add_pkg_date_VU}")
 		endif()
 	endif()
 
-	if(NOT DEFINED _args_RELATIONSHIP)
-		set(_args_RELATIONSHIP "SPDXRef-${_sbom_project} DEPENDS_ON ${_args_SPDXID}")
+	if(NOT DEFINED _arg_add_pkg_RELATIONSHIP)
+		set(_arg_add_pkg_RELATIONSHIP "SPDXRef-${_sbom_project} DEPENDS_ON ${_arg_add_pkg_SPDXID}")
 	else()
-		string(REPLACE "@SBOM_LAST_SPDXID@" "${_args_SPDXID}" _args_RELATIONSHIP "${_args_RELATIONSHIP}")
+		string(REPLACE "@SBOM_LAST_SPDXID@" "${_arg_add_pkg_SPDXID}" _arg_add_pkg_RELATIONSHIP "${_arg_add_pkg_RELATIONSHIP}")
 	endif()
-	string(APPEND _fields "\nRelationship: ${_args_RELATIONSHIP}\nRelationship: ${_args_SPDXID} CONTAINS NOASSERTION")
+	string(APPEND _fields "\nRelationship: ${_arg_add_pkg_RELATIONSHIP}\nRelationship: ${_arg_add_pkg_SPDXID} CONTAINS NOASSERTION")
 
 	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 
-	_sbom_append_sbom_snippet("${_args_SPDXID}.cmake")
+	_sbom_append_sbom_snippet("${_arg_add_pkg_SPDXID}.cmake")
 	file(
 		GENERATE
-		OUTPUT ${_sbom_snippet_dir}/${_args_SPDXID}.cmake
+		OUTPUT ${_sbom_snippet_dir}/${_arg_add_pkg_SPDXID}.cmake
 		CONTENT
 		"
 			file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
@@ -1182,54 +1182,54 @@ endfunction()
 function(sbom_add_external ID PATH)
 	set(oneValueArgs RENAME SPDXID RELATIONSHIP)
 	cmake_parse_arguments(
-		SBOM_EXTERNAL "" "${oneValueArgs}" "" ${ARGN}
+		_arg_add_extern "" "${oneValueArgs}" "" ${ARGN}
 	)
 
 	_sbom_builder_is_setup()
 
-	if(SBOM_EXTERNAL_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${SBOM_EXTERNAL_UNPARSED_ARGUMENTS}")
+	if(_arg_add_extern_UNPARSED_ARGUMENTS)
+		message(FATAL_ERROR "Unknown arguments: ${_arg_add_extern_UNPARSED_ARGUMENTS}")
 	endif()
 
-	if("${SBOM_EXTERNAL_SPDXID}" STREQUAL "")
+	if("${_arg_add_extern_SPDXID}" STREQUAL "")
 		get_property(_spdxids GLOBAL PROPERTY sbom_spdxids)
-		set(SBOM_EXTERNAL_SPDXID "DocumentRef-${_spdxids}")
+		set(_arg_add_extern_SPDXID "DocumentRef-${_spdxids}")
 		math(EXPR _spdxids "${_spdxids} + 1")
 		set_property(GLOBAL PROPERTY sbom_spdxids "${_spdxids}")
 	endif()
 
-	if(NOT "${SBOM_EXTERNAL_SPDXID}" MATCHES "^DocumentRef-[-a-zA-Z0-9]+$")
-		message(FATAL_ERROR "Invalid DocumentRef \"${SBOM_EXTERNAL_SPDXID}\"")
+	if(NOT "${_arg_add_extern_SPDXID}" MATCHES "^DocumentRef-[-a-zA-Z0-9]+$")
+		message(FATAL_ERROR "Invalid DocumentRef \"${_arg_add_extern_SPDXID}\"")
 	endif()
 
-	set(SBOM_LAST_SPDXID "${SBOM_EXTERNAL_SPDXID}" PARENT_SCOPE)
+	set(SBOM_LAST_SPDXID "${_arg_add_extern_SPDXID}" PARENT_SCOPE)
 
 	get_filename_component(sbom_dir "${_sbom}" DIRECTORY)
 
-	if("${SBOM_EXTERNAL_RELATIONSHIP}" STREQUAL "")
-		set(SBOM_EXTERNAL_RELATIONSHIP
-			"SPDXRef-${_sbom_project} DEPENDS_ON ${SBOM_EXTERNAL_SPDXID}:${ID}"
+	if("${_arg_add_extern_RELATIONSHIP}" STREQUAL "")
+		set(_arg_add_extern_RELATIONSHIP
+			"SPDXRef-${_sbom_project} DEPENDS_ON ${_arg_add_extern_SPDXID}:${ID}"
 		)
 	else()
-		string(REPLACE "@SBOM_LAST_SPDXID@" "${SBOM_EXTERNAL_SPDXID}"
-			SBOM_EXTERNAL_RELATIONSHIP "${SBOM_EXTERNAL_RELATIONSHIP}"
+		string(REPLACE "@SBOM_LAST_SPDXID@" "${_arg_add_extern_SPDXID}"
+			_arg_add_extern_RELATIONSHIP "${_arg_add_extern_RELATIONSHIP}"
 		)
 	endif()
 
 	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 
-	_sbom_append_sbom_snippet("${SBOM_EXTERNAL_SPDXID}.cmake")
+	_sbom_append_sbom_snippet("${_arg_add_extern_SPDXID}.cmake")
 	file(
 		GENERATE
-		OUTPUT ${_sbom_snippet_dir}/${SBOM_EXTERNAL_SPDXID}.cmake
+		OUTPUT ${_sbom_snippet_dir}/${_arg_add_extern_SPDXID}.cmake
 		CONTENT
 "file(SHA1 \"${PATH}\" ext_sha1)
 file(READ \"${PATH}\" ext_content)
-if(\"${SBOM_EXTERNAL_RENAME}\" STREQUAL \"\")
+if(\"${_arg_add_extern_RENAME}\" STREQUAL \"\")
 	get_filename_component(ext_name \"${PATH}\" NAME)
 	file(WRITE \"${sbom_dir}/\${ext_name}\" \"\${ext_content}\")
 else()
-	file(WRITE \"${sbom_dir}/${SBOM_EXTERNAL_RENAME}\" \"\${ext_content}\")
+	file(WRITE \"${sbom_dir}/${_arg_add_extern_RENAME}\" \"\${ext_content}\")
 endif()
 
 if(NOT \"\${ext_content}\" MATCHES \"[\\r\\n]DocumentNamespace:\")
@@ -1239,9 +1239,9 @@ endif()
 string(REGEX REPLACE
 	\"^.*[\\r\\n]DocumentNamespace:[ \\t]*([^#\\r\\n]*).*$\" \"\\\\1\" ext_ns \"\${ext_content}\")
 
-list(APPEND SBOM_EXT_DOCS \"ExternalDocumentRef: ${SBOM_EXTERNAL_SPDXID} \${ext_ns} SHA1: \${ext_sha1}\")
+list(APPEND SBOM_EXT_DOCS \"ExternalDocumentRef: ${_arg_add_extern_SPDXID} \${ext_ns} SHA1: \${ext_sha1}\")
 
-file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"Relationship: ${SBOM_EXTERNAL_RELATIONSHIP}\\n\")
+file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"Relationship: ${_arg_add_extern_RELATIONSHIP}\\n\")
 "
 	)
 endfunction()
