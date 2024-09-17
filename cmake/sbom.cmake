@@ -365,10 +365,7 @@ macro(_sbom_generate_document_template)
 	set(_pkg_purpose_fields FALSE)
 	if(DEFINED _arg_sbom_gen_PACKAGE_PURPOSE)
 		set(_pkg_purpose_fields TRUE)
-		set(_pkg_purpose_field_txt "")
-		foreach(_purpose IN LISTS _arg_sbom_gen_PACKAGE_PURPOSE)
-			set(_pkg_purpose_field_txt "${_pkg_purpose_field_txt}\nPrimaryPackagePurpose: ${_purpose}")
-		endforeach()
+		set(_pkg_purpose_field_txt "\nPrimaryPackagePurpose: ${_arg_sbom_gen_PACKAGE_PURPOSE}")
 	endif()
 
 	file(
@@ -516,21 +513,21 @@ function(_sbom_parse_package_notes pkg_notes_arg out_pkg_SUMMARY out_pkg_DESC ou
 	endforeach()
 endfunction()
 
-function(_sbom_parse_package_purpose pkg_purpose_arg out_purpose_list)
+function(_sbom_parse_package_purpose pkg_purpose_arg out_purpose)
 	set(options "APPLICATION;FRAMEWORK;LIBRARY;CONTAINER;OPERATING-SYSTEM;DEVICE;FIRMWARE;SOURCE;ARCHIVE;FILE;INSTALL;OTHER")
 	cmake_parse_arguments(_arg "${options}" "" "" ${pkg_purpose_arg})
 	if(_arg_UNPARSED_ARGUMENTS)
 		message(FATAL_ERROR "Unknown keywords for PURPOSE: ${_arg_UNPARSED_ARGUMENTS}")
 	endif()
 
-	set(${out_purpose_list} "")
+	# only one option is allowed
+	set(${out_purpose} "")
 	foreach(opt ${options})
 		if(_arg_${opt})
-			list(APPEND ${out_purpose_list} ${opt})
+			set(${out_purpose} ${opt} PARENT_SCOPE)
+			return()
 		endif()
 	endforeach()
-
-	set(${out_purpose_list} "${${out_purpose_list}}" PARENT_SCOPE)
 endfunction()
 
 function(_sbom_parse_filetype file_type_arg out_filetype_list)
@@ -1130,9 +1127,7 @@ function(sbom_add_package NAME)
 
 	if(DEFINED _arg_add_pkg_PURPOSE)
 		_sbom_parse_package_purpose("${_arg_add_pkg_PURPOSE}" _arg_add_pkg_PURPOSE)
-		foreach(_purpose IN LISTS _arg_add_pkg_PURPOSE)
-			string(APPEND _fields "\nPrimaryPackagePurpose: ${_purpose}")
-		endforeach()
+		string(APPEND _fields "\nPrimaryPackagePurpose: ${_arg_add_pkg_PURPOSE}")
 	endif()
 
 	if(DEFINED _arg_add_pkg_DATE)

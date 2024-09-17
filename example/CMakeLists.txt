@@ -39,7 +39,7 @@ sbom_generate(
 	PACKAGE_DOWNLOAD "http://example.org/download"
 	PACKAGE_LICENSE "MIT"
 	PACKAGE_NOTES SUMMARY "Just a simple example project, to demonstrate the SBOM-Builder"
-	PACKAGE_PURPOSE "APPLICATION" "OTHER"
+	PACKAGE_PURPOSE "APPLICATION"
 )
 
 # mention the dependencies used in the SBOM

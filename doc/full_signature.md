@@ -194,7 +194,7 @@ sbom_add_package(
 	[PURPOSE <APPLICATION|FRAMEWORK|LIBRARY|
 			  CONTAINER|OPERATING-SYSTEM|DEVICE|
 			  FIRMWARE|SOURCE|ARCHIVE|
-			  FILE|INSTALL|OTHER>...]
+			  FILE|INSTALL|OTHER>]
 	[DATE [RELEASE <date>]
 	      [BUILD <date>]
 		  [VALID_UNTIL <date>] ]
@@ -314,11 +314,8 @@ sbom_add_package(
 - `PURPOSE`:
   - No SBOM entry when omitted.
   - See [SPDX clause 7.24](https://spdx.github.io/spdx-spec/v2.3/package-information/#724-primary-package-purpose-field) for more information.
-  - One or many of the following keywords:
+  - One of the following keywords:
     - `APPLICATION`, `FRAMEWORK`, `LIBRARY`, `CONTAINER`, `OPERATING-SYSTEM`, `DEVICE`, `FIRMWARE`, `SOURCE`, `ARCHIVE`, `FILE`, `INSTALL`, `OTHER`.
-  - Usage:
-    - `sbom_generate(... PURPOSE "APPLICATION" "FIRMWARE" ...)`
-    - `sbom_generate(... PURPOSE "FILE" "SOURCE" "LIBRARY" ...)`
 - `DATE`:
   - No SBOM entries when omitted.
   - `RELEASE`: The date the package was released.
