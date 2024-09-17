@@ -828,8 +828,8 @@ function(_sbom_add_pkg_content PATH)
 		endforeach()
 	endif()
 
+	set(_hash_algo "SHA1;SHA256") # SHA1 is always required by SPDX, SHA256 required by TR-03183
 	if(DEFINED _arg_add_pkg_content_CHECKSUM)
-		set(_hash_algo "SHA1;SHA256") # SHA1 is always required by SPDX, SHA256 required by TR-03183
 		set(_supported_algorithms "MD5;SHA224;SHA384;SHA512;SHA3-256;SHA3-384;SHA3-512")
 		foreach(_checksum ${_arg_add_pkg_content_CHECKSUM})
 			if("${_checksum}" IN_LIST _supported_algorithms)
