@@ -52,7 +52,7 @@ jobs:
     - name: setup python
       uses: actions/setup-python@v3
       with:
-        python-version: "3.10"
+        python-version: "3.12"
 
     - name: Install spdx-tools
       run: |
@@ -68,6 +68,6 @@ jobs:
         CMAKE_VERSION: ${{ matrix.cmake_version }}
 
     - name: Install
-      run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --target install
+      run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --target install -j1
       env:
         CMAKE_VERSION: ${{ matrix.cmake_version }}
