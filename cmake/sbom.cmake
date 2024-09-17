@@ -883,13 +883,13 @@ cmake_policy(SET CMP0012 NEW)
 set(ADDING_DIR ${_arg_add_pkg_content_DIR})
 
 set(_files \"\")
-if(NOT ADDING_DIR)
-	set(_files \"./${PATH}\")
-else()
+if(ADDING_DIR)
 	file(GLOB_RECURSE _files
 		LIST_DIRECTORIES false RELATIVE \"\${CMAKE_INSTALL_PREFIX}\"
 		\"\${CMAKE_INSTALL_PREFIX}/${PATH}/*\"
-)
+	)
+else()
+	set(_files \"${PATH}\")
 endif()
 
 if((NOT ADDING_DIR) AND (NOT EXISTS \${CMAKE_INSTALL_PREFIX}/${PATH}))
