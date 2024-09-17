@@ -561,7 +561,6 @@ function(sbom_generate)
 		PACKAGE_URL
 		PACKAGE_LICENSE
 		PACKAGE_COPYRIGHT
-		ENABLE_CHECKS
 	)
 	set(multiValueArgs CREATOR PACKAGE_NOTES PACKAGE_PURPOSE)
 	cmake_parse_arguments(
@@ -665,12 +664,6 @@ function(sbom_generate)
 			message(FATAL_ERROR "Specifiy PACKAGE_URL <url> when NAMESPACE is omitted.")
 		endif()
 		set(_arg_sbom_gen_NAMESPACE "${_arg_sbom_gen_PACKAGE_URL}/spdxdocs/${_arg_sbom_gen_PACKAGE_NAME}-${_arg_sbom_gen_PACKAGE_VERSION}")
-	endif()
-
-	if(${_arg_sbom_gen_ENABLE_CHECKS})
-		set(SBOM_CHECKS_ENABLED ON CACHE BOOL "Warn on important missing fields.")
-	else()
-		set(SBOM_CHECKS_ENABLED OFF CACHE BOOL "Warn on important missing fields.")
 	endif()
 
 	# remove special characters from package name and replace with -
