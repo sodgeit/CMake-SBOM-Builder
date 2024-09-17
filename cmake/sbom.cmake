@@ -343,6 +343,9 @@ macro(_sbom_generate_document_template)
 		set(_pkg_supplier_field "${_pkg_supplier_field} (${_arg_sbom_gen_CREATOR_EMAIL})")
 	endif()
 
+	#make sure creator name can be used to create a uri
+	string(REGEX REPLACE "[ ]+" "-" _pkg_creator_name "${_pkg_creator_name}")
+
 	if(DEFINED _arg_sbom_gen_PACKAGE_COPYRIGHT)
 		set(_pkg_copyright_field "PackageCopyrightText: ${_arg_sbom_gen_PACKAGE_COPYRIGHT}")
 	endif()
