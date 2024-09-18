@@ -33,6 +33,7 @@ PackageSupplier: Organization: Example Org (example@org.com)
 PackageDownloadLocation: http://example.org/download
 PackageLicenseConcluded: MIT
 PackageLicenseDeclared: MIT
+FilesAnalyzed: true
 PackageCopyrightText: 2024 Example Org
 PackageHomePage: https://github.com/sodgeit/CMake-SBOM-Builder
 PackageSummary: <text>Just a simple example project, to demonstrate the SBOM-Builder</text>
