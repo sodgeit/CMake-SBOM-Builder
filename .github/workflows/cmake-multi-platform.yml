@@ -68,11 +68,10 @@ jobs:
         CMAKE_VERSION: ${{ matrix.cmake_version }}
 
     - name: Install
+      # this has to create a parsing table for the spdx-file syntax, which for some reason
+      # is printed to stderr...
       run: |
-        # this has to create a parsing table for the spdx-file syntax, which for some reason
-        # is printed to stderr...
-        pyspdxtools -i ${{ github.workspace }}/example/output/*.spdx 2>$1
-        pyspdxtools -i ${{ github.workspace }}/example/output/*.spdx 2>$1
+        pyspdxtools -i ${{ github.workspace }}/example/output/*.spdx
         cmake --build ${{ steps.strings.outputs.build-output-dir }} --target install
       env:
         CMAKE_VERSION: ${{ matrix.cmake_version }}
