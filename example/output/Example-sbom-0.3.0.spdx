@@ -33,7 +33,6 @@ PackageSupplier: Organization: Example Org (example@org.com)
 PackageDownloadLocation: http://example.org/download
 PackageLicenseConcluded: MIT
 PackageLicenseDeclared: MIT
-FilesAnalyzed: true
 PackageCopyrightText: 2024 Example Org
 PackageHomePage: https://github.com/sodgeit/CMake-SBOM-Builder
 PackageSummary: <text>Just a simple example project, to demonstrate the SBOM-Builder</text>
@@ -50,7 +49,6 @@ PackageLicenseDeclared: NOASSERTION
 PackageCopyrightText: NOASSERTION
 PackageVersion: 3.2.0
 PackageSupplier: Person: Jarryd Beck
-FilesAnalyzed: false
 PackageLicenseConcluded: MIT
 Relationship: SPDXRef-Example DEPENDS_ON SPDXRef-cxxopts-0
 Relationship: SPDXRef-cxxopts-0 CONTAINS NOASSERTION
@@ -63,7 +61,6 @@ PackageLicenseDeclared: NOASSERTION
 PackageCopyrightText: NOASSERTION
 PackageVersion: 1.85.0
 PackageSupplier: Organization: Boost
-FilesAnalyzed: false
 PackageLicenseConcluded: BSL-1.0
 Relationship: SPDXRef-Example DEPENDS_ON SPDXRef-Boost-1
 Relationship: SPDXRef-Boost-1 CONTAINS NOASSERTION
