@@ -6,7 +6,7 @@
 
 include(sbom)
 
-sbom_generate(CREATOR PERSON target_test PACKAGE_URL https://www.target_test.com)
+sbom_generate(CREATOR PERSON target_test PACKAGE_URL https://www.target_test.com PACKAGE_LICENSE MIT)
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/foo.c "int main() {}")
 

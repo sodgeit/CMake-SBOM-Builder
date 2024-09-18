@@ -6,7 +6,7 @@
 
 include(sbom)
 
-sbom_generate(CREATOR ORGANIZATION FileTest PACKAGE_URL https://www.fileTest.com)
+sbom_generate(CREATOR ORGANIZATION FileTest PACKAGE_URL https://www.fileTest.com PACKAGE_LICENSE MIT)
 
 install(FILES ${CMAKE_CURRENT_LIST_FILE} DESTINATION .)
 

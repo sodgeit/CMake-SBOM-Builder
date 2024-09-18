@@ -6,7 +6,7 @@
 
 include(sbom)
 
-sbom_generate(CREATOR ORGANIZATION DirectoryTest PACKAGE_URL https://www.directoryTest.com)
+sbom_generate(CREATOR ORGANIZATION DirectoryTest PACKAGE_URL https://www.directoryTest.com PACKAGE_LICENSE MIT)
 
 install(FILES ${CMAKE_CURRENT_LIST_FILE} DESTINATION dir)
 install(FILES ${CMAKE_CURRENT_LIST_FILE} DESTINATION dir RENAME file.txt)

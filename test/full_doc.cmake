@@ -13,6 +13,7 @@ sbom_generate(
 	NAMESPACE "https://test.com/spdxdoc/me"
 	CREATOR ORGANIZATION FullDocTest
 	PACKAGE_URL https://www.fullDocTest.com
+	PACKAGE_LICENSE MIT
 )
 
 sbom_finalize()

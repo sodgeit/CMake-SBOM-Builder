@@ -6,7 +6,7 @@ DocumentNamespace: https://github.com/sodgeit/CMake-SBOM-Builder/spdxdocs/Exampl
 Creator: Organization: Example Org (example@org.com)
 Creator: Tool: CMake-SBOM-Builder-v0.3.0
 CreatorComment: <text>This SPDX document was created from CMake 3.30.1, using CMake-SBOM-Builder from https://github.com/sodgeit/CMake-SBOM-Builder</text>
-Created: 2024-08-29T09:16:55Z
+Created: 2024-09-17T15:30:54Z
 
 PackageName: Clang
 SPDXID: SPDXRef-compiler
@@ -26,7 +26,7 @@ RelationshipComment: <text>SPDXRef-Example is built by compiler Clang (C:/Progra
 PackageName: Example
 SPDXID: SPDXRef-Example
 ExternalRef: SECURITY cpe23Type cpe:2.3:o:microsoft:windows_10:-:*:*:*:*:*:x64:*
-ExternalRef: PACKAGE-MANAGER purl pkg:supplier/Example/Example@v0.3.0
+ExternalRef: PACKAGE-MANAGER purl pkg:supplier/Example-Org/Example@v0.3.0
 PackageVersion: v0.3.0
 PackageFileName: Example-v0.3.0.zip
 PackageSupplier: Organization: Example Org (example@org.com)
@@ -37,60 +37,58 @@ PackageCopyrightText: 2024 Example Org
 PackageHomePage: https://github.com/sodgeit/CMake-SBOM-Builder
 PackageSummary: <text>Just a simple example project, to demonstrate the SBOM-Builder</text>
 PackageComment: <text>Built by CMake 3.30.1 with Release configuration for Windows (AMD64)</text>
-PackageVerificationCode: eab840722ebab9379e046b88ce0e6f6f616a2eb6
-BuiltDate: 2024-08-29T09:16:55Z
+PrimaryPackagePurpose: APPLICATION
+PackageVerificationCode: ae2f5127406146b9ab607f1ede155bca519ba872
+BuiltDate: 2024-09-17T15:30:54Z
+ReleaseDate: 2024-09-17T15:30:54Z
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-Example
 
 PackageName: cxxopts
 SPDXID: SPDXRef-cxxopts-0
-ExternalRef: SECURITY cpe23Type cpe:2.3:o:microsoft:windows_10:-:*:*:*:*:*:x64:*
-PackageDownloadLocation: NOASSERTION
-PackageLicenseDeclared: NOASSERTION
-PackageCopyrightText: NOASSERTION
-PackageVersion: 3.2.0
-PackageSupplier: Jarryd Beck (https://github.com/jarro2783/cxxopts)
-FilesAnalyzed: false
 PackageLicenseConcluded: MIT
+PackageLicenseDeclared: NOASSERTION
+PackageVersion: 3.2.0
+PackageSupplier: Person: Jarryd Beck
+PackageDownloadLocation: NOASSERTION
+PackageCopyrightText: NOASSERTION
 Relationship: SPDXRef-Example DEPENDS_ON SPDXRef-cxxopts-0
 Relationship: SPDXRef-cxxopts-0 CONTAINS NOASSERTION
 
 PackageName: Boost
 SPDXID: SPDXRef-Boost-1
-ExternalRef: SECURITY cpe23Type cpe:2.3:o:microsoft:windows_10:-:*:*:*:*:*:x64:*
-PackageDownloadLocation: NOASSERTION
-PackageLicenseDeclared: NOASSERTION
-PackageCopyrightText: NOASSERTION
-PackageVersion: 1.85.0
-PackageSupplier: https://www.boost.org
-FilesAnalyzed: false
 PackageLicenseConcluded: BSL-1.0
+PackageLicenseDeclared: NOASSERTION
+PackageVersion: 1.85.0
+PackageSupplier: Organization: Boost Foundation
+PackageDownloadLocation: NOASSERTION
+PackageCopyrightText: NOASSERTION
 Relationship: SPDXRef-Example DEPENDS_ON SPDXRef-Boost-1
 Relationship: SPDXRef-Boost-1 CONTAINS NOASSERTION
 
 FileName: ./include/Example_version.h
 SPDXID: SPDXRef-include-Example-version-h-2
+LicenseConcluded: MIT
 FileType: SOURCE
-FileChecksum: SHA1: d8531f8bb2896353ae13c24ec84324ebbc11a1e4
-LicenseConcluded: NOASSERTION
-LicenseInfoInFile: NOASSERTION
-FileCopyrightText: NOASSERTION
+FileCopyrightText: 2024 Example Org
+FileChecksum: SHA1: 431efda6e36ca14a3a71892fb5e94582f713b95f
+FileChecksum: SHA256: 81e62d1f1c32a1b055aca45f75f8e167cc53c14beb70cae6b5bc92949f1cba20
 Relationship: SPDXRef-Example CONTAINS SPDXRef-include-Example-version-h-2
 
 FileName: ./share/example/version.txt
 SPDXID: SPDXRef-share-example-version-txt-3
-FileType: DOCUMENTATION
+LicenseConcluded: MIT
 FileType: TEXT
-FileChecksum: SHA1: ad9f5f85711c66b6fce6975f6b7c489863e60974
-LicenseConcluded: NOASSERTION
-LicenseInfoInFile: NOASSERTION
-FileCopyrightText: NOASSERTION
+FileType: DOCUMENTATION
+FileCopyrightText: 2024 Example Org
+FileChecksum: SHA1: ef8ae947da2dd7b37cc1e186c42975c702ec6fbe
+FileChecksum: SHA256: 7836146189efb5232dc27bb99a67f9b9eec407463cf022d55cd9f9fb111d6ebb
 Relationship: SPDXRef-Example CONTAINS SPDXRef-share-example-version-txt-3
 
 FileName: ./bin/example.exe
 SPDXID: SPDXRef-bin-TARGET-FILE-NAME-example-4
+LicenseConcluded: MIT
 FileType: BINARY
-FileChecksum: SHA1: eaf3cf61d5fdccd5fc90dbfe6ec3aa4da3641754
-LicenseConcluded: NOASSERTION
-LicenseInfoInFile: NOASSERTION
-FileCopyrightText: NOASSERTION
+FileCopyrightText: 2024 Example Org
+FileChecksum: SHA1: a91168ee725c567ecdcb20b1e2dfafb7cb8c8f89
+FileChecksum: SHA256: af9c28ab48f7f5a3c26d100da127ea77f594447c0f30a8231e348d37f8ded424
 Relationship: SPDXRef-Example CONTAINS SPDXRef-bin-TARGET-FILE-NAME-example-4
