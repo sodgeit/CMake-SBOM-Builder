@@ -48,7 +48,7 @@ PackageDownloadLocation: NOASSERTION
 PackageLicenseDeclared: NOASSERTION
 PackageCopyrightText: NOASSERTION
 PackageVersion: 3.2.0
-PackageSupplier: Jarryd Beck (https://github.com/jarro2783/cxxopts)
+PackageSupplier: Person: Jarryd Beck
 FilesAnalyzed: false
 PackageLicenseConcluded: MIT
 Relationship: SPDXRef-Example DEPENDS_ON SPDXRef-cxxopts-0
@@ -61,7 +61,7 @@ PackageDownloadLocation: NOASSERTION
 PackageLicenseDeclared: NOASSERTION
 PackageCopyrightText: NOASSERTION
 PackageVersion: 1.85.0
-PackageSupplier: https://www.boost.org
+PackageSupplier: Organization: Boost
 FilesAnalyzed: false
 PackageLicenseConcluded: BSL-1.0
 Relationship: SPDXRef-Example DEPENDS_ON SPDXRef-Boost-1
