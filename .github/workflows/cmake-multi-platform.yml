@@ -59,7 +59,7 @@ jobs:
         pip install spdx-tools
         # this has to create a parsing table for the spdx-file syntax, which for some reason
         # is printed to stderr...
-        pyspdxtools -i ${{ github.workspace }}/example/output/*.spdx 2>&1
+        pyspdxtools -i ${{ github.workspace }}/example/output/*.spdx 2>/dev/null
 
     - name: Configure CMake
       run: >
