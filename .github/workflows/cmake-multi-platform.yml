@@ -71,11 +71,8 @@ jobs:
       run: |
         # this has to create a parsing table for the spdx-file syntax, which for some reason
         # is printed to stderr...
-        if [ "${{ runner.os }}" == "Linux" ]; then
-          pyspdxtools -i ${{ github.workspace }}/example/output/*.spdx 2>$1 || true
-        elif [ "${{ runner.os }}" == "Windows" ]; then
-          pyspdxtools -i ${{ github.workspace }}/example/output/*.spdx 2>$1 || true; exit 0
-        fi
-        cmake --build ${{ steps.strings.outputs.build-output-dir }} --target install -j1
+        pyspdxtools -i ${{ github.workspace }}/example/output/*.spdx 2>$1
+        pyspdxtools -i ${{ github.workspace }}/example/output/*.spdx 2>$1
+        cmake --build ${{ steps.strings.outputs.build-output-dir }} --target install
       env:
         CMAKE_VERSION: ${{ matrix.cmake_version }}
