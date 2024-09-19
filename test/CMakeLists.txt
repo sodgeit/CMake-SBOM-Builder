@@ -1,12 +1,37 @@
-# SPDX-FileCopyrightText: 2023-2024 Jochem Rutgers
-#
-# SPDX-License-Identifier: MIT
+cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 
-if(NOT CMAKE_VERSION VERSION_LESS 3.17)
-	set(rmdir rm -rf)
-else()
+project(CSBUnitTests)
+
+if(CMAKE_VERSION VERSION_LESS 3.17)
 	set(rmdir "remove_directory")
+else()
+	set(rmdir rm -rf)
 endif()
+
+
+enable_testing()
+
+set(CSB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
+
+file(GLOB tests "${CMAKE_CURRENT_SOURCE_DIR}/unit/*.cmake")
+foreach(test ${tests})
+	get_filename_component(test_name ${test} NAME_WE)
+
+	message(STATUS "adding test: ${test_name}")
+	add_test(
+		NAME ${test_name}
+		COMMAND ${CMAKE_COMMAND}
+		-DCSB_PATH=${CSB_PATH}
+		-DTEST_NAME=${test_name}
+		-DTEST_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/unit/${test_name}
+		-DTEST_BUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}/unit/${test_name}/build
+		-P "${test}"
+		#-S ${CMAKE_CURRENT_BINARY_DIR}/unit/${test_name}
+		#-B ${CMAKE_CURRENT_BINARY_DIR}/unit/${test_name}/build
+	)
+endforeach()
+
+add_custom_target(test-verbose COMMAND ${CMAKE_CTEST_COMMAND} -C Debug --verbose)
 
 add_custom_target(tests ALL)
 
