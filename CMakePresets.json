@@ -1,0 +1,77 @@
+{
+	"version": 4,
+	"cmakeMinimumRequired": {
+		"major": 3,
+		"minor": 23,
+		"patch": 0
+	},
+	"configurePresets": [
+		{
+			"name": "binary_dir",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/out/${presetName}"
+		},
+		{
+			"name": "install_prefix",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_INSTALL_PREFIX": "${sourceDir}/out/${presetName}/install"
+			}
+		},
+		{
+			"name": "clang_ninja",
+			"hidden": true,
+			"generator": "Ninja",
+			"inherits": [
+				"binary_dir",
+				"install_prefix"
+			],
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "clang",
+				"CMAKE_CXX_COMPILER": "clang++"
+			}
+		},
+		{
+			"name": "clang_ninja_release",
+			"inherits": [
+				"clang_ninja"
+			],
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
+		},
+		{
+			"name": "clang_ninja_debug",
+			"inherits": [
+				"clang_ninja"
+			],
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+		{
+			"name": "clang_ninja_multi",
+			"generator": "Ninja Multi-Config",
+			"inherits": [
+				"binary_dir",
+				"install_prefix"
+			],
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "clang",
+				"CMAKE_CXX_COMPILER": "clang++"
+			}
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "clang_ninja_release",
+			"configurePreset": "clang_ninja_multi",
+			"configuration": "Release"
+		},
+		{
+			"name": "clang_ninja_debug",
+			"configurePreset": "clang_ninja_multi",
+			"configuration": "Debug"
+		}
+	]
+}
