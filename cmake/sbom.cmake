@@ -605,6 +605,11 @@ function(sbom_generate)
 		set(_arg_sbom_gen_PACKAGE_FILENAME "${_arg_sbom_gen_PACKAGE_NAME}-${_arg_sbom_gen_PACKAGE_VERSION}.zip")
 	endif()
 
+	if(NOT DEFINED _arg_sbom_gen_OUTPUT)
+		string(REGEX REPLACE "[^A-Za-z0-9.]+" "_" _safe_package_name "${_arg_sbom_gen_PACKAGE_NAME}")
+		set(_arg_sbom_gen_OUTPUT "${_safe_package_name}-${_arg_sbom_gen_PACKAGE_VERSION}.spdx")
+	endif()
+
 	if(NOT DEFINED _arg_sbom_gen_PACKAGE_DOWNLOAD)
 		# if not defined, the creator made no attempt to specify a download location
 		set(_arg_sbom_gen_PACKAGE_DOWNLOAD "NOASSERTION")
