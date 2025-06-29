@@ -98,7 +98,7 @@ sbom_add_[file|directory|target](
 	<filename|path|target>
 	[LICENSE <SPDX License Expression> [COMMENT <comment_text>]]
 	[SPDXID <id>]
-	[RELATIONSHIP <string>]
+	[RELATIONSHIP <string>...]
 	[FILETYPE <SOURCE|BINARY|ARCHIVE|APPLICATION|AUDIO|IMAGE|TEXT|VIDEO|DOCUMENTATION|SPDX|OTHER>...]
 	[CHECKSUM <MD5|SHA224|SHA256|SHA386|SHA512|SHA3_256|SHA3_384|SHA3_512>...]
 	[COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
@@ -123,14 +123,11 @@ sbom_add_[file|directory|target](
   - If omitted generates a new one.
   - See [SPDX clause 8.2](https://spdx.github.io/spdx-spec/v2.3/file-information/#82-file-spdx-identifier-field) for more information.
   - Whether or not this is specified, the variable `SBOM_LAST_SPDXID` is set to just generated/used SPDXID, which could be used for later relationship definitions.
-- `RELATIONSHIP`: A relationship definition related to this file.
+- `RELATIONSHIP`: An array of relationship definitions related to this package.
   - If omitted a default relationship is added: `SPDXRef-${PACKAGE_NAME} CONTAINS @SBOM_LAST_SPDXID@`
     - `${PACKAGE_NAME}` is the `PACKAGE_NAME` argument given to `sbom_generate()`.
   - See [SPDX clause 11](https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/) for more information.
   - The string `@SBOM_LAST_SPDXID@` will be replaced by the SPDXID that is used for this SBOM item.
-  - ***Limitation:***
-    - This will ***replace*** the default relationship added.
-    - Only one relationship can be added.
 - `FILETYPE`: One or more file types.
   - If omitted, no SBOM entry is generated.
   - See [SPDX clause 8.3](https://spdx.github.io/spdx-spec/v2.3/file-information/#83-file-type-field) for more information.
@@ -178,7 +175,7 @@ sbom_add_package(
 	VERSION <version_string>
 	SUPPLIER <PERSON|ORGANIZATION> <name> [EMAIL <email>]
 	[SPDXID <id>]
-	[RELATIONSHIP <string>]
+	[RELATIONSHIP <string>...]
 	[FILENAME <filename>]
 	[ORIGINATOR <NOASSERTION|PERSON|ORGANIZATION> <name> [EMAIL <email>]]
 	[DOWNLOAD <NOASSERTION|NONE|<url|vcs>>]
@@ -233,20 +230,31 @@ sbom_add_package(
   - See [SPDX clause 7.5](https://spdx.github.io/spdx-spec/v2.3/package-information/#75-package-supplier-field) for more information.
 - `SPDXID`: The ID to use for identifier generation. (spdx clause 7.2)
   - By default, generate a new one. Whether or not this is specified, the variable `SBOM_LAST_SPDXID` is set to just generated/used SPDXID, which could be used for later relationship definitions.
-- `RELATIONSHIP`: A relationship definition related to this package.
-  - If omitted a default relationship is added: `SPDXRef-${PACKAGE_NAME} DEPENDS_ON @SBOM_LAST_SPDXID@`
-    - `${PACKAGE_NAME}` is the `PACKAGE_NAME` argument given to `sbom_generate()`.
+- `RELATIONSHIP`: An array of relationship definitions related to this package.
+  - If omitted default relationships are added:
+    - `SPDXRef-${PACKAGE_NAME} DEPENDS_ON @SBOM_LAST_SPDXID@`
+    - `@SBOM_LAST_SPDXID@ CONTAINS NOASSERTION`
+      - `${PACKAGE_NAME}` is the `PACKAGE_NAME` argument given to `sbom_generate()`.
   - See [SPDX clause 11](https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/) for more information.
   - The string `@SBOM_LAST_SPDXID@` will be replaced by the SPDXID that is used for this SBOM item.
   - Usage:
-    - `sbom_add_package( gtest ...)`
-    - `set(GTEST_SPDX_ID ${SBOM_LAST_SPDXID})`
-    - `sbom_add_package(... RELATIONSHIP "${GTEST_SPDX_ID} TEST_DEPENDENCY_OF @SBOM_LAST_SPDXID@" ...)`
+    - E.g.: Declare dependencies only on some distributed targets instead of the entire package.
+	```
+	sbom_add_target( myCli ...)
+	set(myCli_SPDX_ID ${SBOM_LAST_SPDXID})
+	sbom_add_target( myGui ...)
+	set(myGui_SPDX_ID ${SBOM_LAST_SPDXID})
+	sbom_add_target( anotherBinary ...)
+	sbom_add_package(...
+		RELATIONSHIP
+			"${mycli_SPDX_ID} DEPENDS_ON @SBOM_LAST_SPDXID@"
+	 		"${myGui_SPDX_ID} DEPENDS_ON @SBOM_LAST_SPDXID@"
+		...)
+	 ```
     - To get the spdx-id of another package, save `SBOM_LAST_SPDXID` in a different variable after calling `sbom_add_package(...)`.
   - ***Limitation:***
     - This will ***replace*** the default relationship added, which is: `SPDXRef-${PACKAGE_NAME} DEPENDS_ON @SBOM_LAST_SPDXID@`
-    - Only one relationship can be added.
-    - The Relationship: `@SBOM_LAST_SPDXID@ CONTAINS NOASSERTION` is always added, which can cause confusion.
+    - The Relationship: `@SBOM_LAST_SPDXID@ CONTAINS NOASSERTION` is always added. We treat external packages as a blackbox.
 - `FILENAME`: Filename of the package.
   - No SBOM entry when omitted.
   - See [SPDX clause 7.4](https://spdx.github.io/spdx-spec/v2.3/package-information/#74-package-file-name-field) for more information.

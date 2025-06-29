@@ -212,7 +212,7 @@ sbom_add_[file|directory|target](
 	<filename|path|target>
 	[LICENSE <SPDX License Expression>]
 	[COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
-	[RELATIONSHIP <string>]
+	[RELATIONSHIP <string>...]
 )
 ```
 
@@ -228,6 +228,7 @@ sbom_add_[file|directory|target](
   - If you are adding a target or file from one of your dependencies, specify thier copyright text.
     - Use `NOASSERTION` or `NONE` if the information cannot be determined or is not specified.
 - `RELATIONSHIP`:
+  - One or more strings describing the relationship between sbom components
   - Defaults to `<project_id> CONTAINS <id>`
     - `<project_id>` and `<id>`are placeholders for the SPDX identifiers that are automatically generated.
   - Use this argument to override the default relationship. See [SPDX clause 11](https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/) for more information.
@@ -240,7 +241,7 @@ sbom_add_package(
 	LICENSE <SPDX License Expression>
 	VERSION <version_string>
 	SUPPLIER <PERSON|ORGANIZATION> <name> [EMAIL <email>]
-	[RELATIONSHIP <string>]
+	[RELATIONSHIP <string>...]
 	...
 )
 ```
@@ -253,17 +254,20 @@ sbom_add_package(
   - One of the `<PERSON|ORGANIZATION>` keywords must be provided.
   - `EMAIL` is optional.
 - `RELATIONSHIP`:
-  - Defaults to `<project_id> DEPENDS_ON <id>`.
-    - `<project_id>` and `<id>`are placeholders for the SPDX identifiers that are automatically generated.
+  - One or more strings describing the relationship between sbom components
+  - Defaults to:
+    - `<project> DEPENDS_ON <this_sbom_item>`
+    - `<this_sbom_item> CONTAINS NOASSERTION`.
+      - `<project>` and `<this_sbom_item>`are placeholders for the SPDX identifiers that are automatically generated.
   - Use this argument to override the default relationship. See [SPDX clause 11](https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/) for more information.
-  - Eg: In the example above, the dependency `cxxopts` is only used by the `cli` and not the entire package.  The relationship can be overridden as follows:
+  - Eg: In the example below, the dependency `cxxopts` is only used by the `cli` and not the entire package.  The relationship can be overridden as follows:
   ```cmake
   sbom_add_target(cli)
   set(cli_spdxid ${SBOM_LAST_SPDXID})
   sbom_add_package(cxxopts ... RELATIONSHIP "${cli_spdxid} DEPENDS_ON @SBOM_LAST_SPDXID@" )
   ```
   - - `${SBOM_LAST_SPDXID}` is set to the SPDX identifier of the last added file/package/target.
-    - `@SBOM_LAST_SPDXID@` is a placeholder for the SPDX identifier that will be generated for `cxxopts`.
+    - `@SBOM_LAST_SPDXID@` is a placeholder for the SPDX identifier that will be generated for `cxxopts` in the call to `sbom_add_package`.
 
 ### `sbom_add_external`
 
@@ -272,7 +276,7 @@ sbom_add_external(
 	<id>
 	<path>
 	[RENAME <filename>]
-	[RELATIONSHIP <string>]
+	[RELATIONSHIP <string>...]
 	[SPDXID <id>]
 )
 ```
@@ -281,7 +285,10 @@ sbom_add_external(
 - `path`: Reference to another SDPX file as External document reference. Then, depend on the package named in that document. The external SDPX file is copied next to the SBOM. Generator expressions are supported.
 - `RENAME`: Rename the external document to the given filename, without directories.
 - `SPDXID`: The identifier of the external document, which is used as prefix for the package identifier. Defaults to a unique identifier. The package identifier is added automatically. The variable `SBOM_LAST_SPDXID` is set to the used identifier.
-- `RELATIONSHIP`: Defaults to `${Project} DEPENDS_ON <id>`
+- `RELATIONSHIP`:
+  - One or more strings describing the relationship between sbom components
+  - Defaults to `<project> DEPENDS_ON <id>`
+    - `<project>` being a placeholder for the generated SPDXID describing the entire package.
 
 ### `sbom_finalize`
 
