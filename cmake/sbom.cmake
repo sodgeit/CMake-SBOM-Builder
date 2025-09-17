@@ -835,7 +835,7 @@ function(_sbom_add_pkg_content PATH)
 	_sbom_parse_license("CONCLUDED;${_arg_add_pkg_content_LICENSE}" _arg_add_pkg_content_LICENSE_CONCLUDED _arg_add_pkg_content_LICENSE_DECLARED _arg_add_pkg_content_LICENSE_COMMENT)
 	string(APPEND _fields "\nLicenseConcluded: ${_arg_add_pkg_content_LICENSE_CONCLUDED}")
 	if(DEFINED _arg_add_pkg_content_LICENSE_COMMENT)
-		string(APPEND _fields "\nLicenseComments: ${_arg_add_pkg_content_LICENSE_COMMENT}")
+		string(APPEND _fields "\nLicenseComments: <text>${_arg_add_pkg_content_LICENSE_COMMENT}</text>")
 	endif()
 
 	if(DEFINED _arg_add_pkg_content_FILETYPE)
