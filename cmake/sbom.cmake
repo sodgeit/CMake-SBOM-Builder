@@ -234,8 +234,8 @@ $<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>://>#define ${PROJECT_NAME_UC}_VERSION_SU
 endfunction()
 
 # Common Platform Enumeration: https://nvd.nist.gov/products/cpe
-#
-# TODO: This detection can be improved.
+# TODO: This detection can still be improved.
+
 if(WIN32)
 	if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
 		set(_arch "x64")
@@ -259,19 +259,30 @@ if(WIN32)
 		set(SBOM_CPE "cpe:2.3:o:microsoft:windows_8:-:*:*:*:*:*:${_arch}:*")
 	elseif("${CMAKE_SYSTEM_VERSION}" STREQUAL "6.3")
 		set(SBOM_CPE "cpe:2.3:o:microsoft:windows_8.1:-:*:*:*:*:*:${_arch}:*")
-	elseif(NOT "${CMAKE_SYSTEM_VERSION}" VERSION_LESS 10)
+	# first windows 11 had version 22000
+	# https://en.wikipedia.org/wiki/Windows_11_version_history
+	elseif("${CMAKE_SYSTEM_VERSION}" VERSION_LESS 10.0.22000)
 		set(SBOM_CPE "cpe:2.3:o:microsoft:windows_10:-:*:*:*:*:*:${_arch}:*")
 	else()
-		set(SBOM_CPE "cpe:2.3:o:microsoft:windows:-:*:*:*:*:*:${_arch}:*")
+		set(SBOM_CPE "cpe:2.3:o:microsoft:windows_11:-:*:*:*:*:*:${_arch}:*")
 	endif()
 elseif(APPLE)
 	set(SBOM_CPE "cpe:2.3:o:apple:mac_os:*:*:*:*:*:*:${CMAKE_SYSTEM_PROCESSOR}:*")
 elseif(UNIX)
-	set(SBOM_CPE "cpe:2.3:o:canonical:ubuntu_linux:-:*:*:*:*:*:${CMAKE_SYSTEM_PROCESSOR}:*")
+	set(SBOM_CPE "cpe:2.3:o:*:many_linux:-:*:*:*:*:*:${CMAKE_SYSTEM_PROCESSOR}:*")
+	if(EXISTS /etc/os-release)
+		file(READ /etc/os-release _os_release_content)
+		string(REPLACE "\n" ";" _os_release_content ${_os_release_content})
+		foreach(line ${_os_release_content})
+			if (line MATCHES "^CPE_NAME=\"(.+)\"")
+				set(SBOM_CPE "${CMAKE_MATCH_1}")
+			endif()
+		endforeach()
+	endif()
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
 	set(SBOM_CPE "cpe:2.3:h:arm:arm:-:*:*:*:*:*:*:*")
 else()
-	message(FATAL_ERROR "Unsupported platform")
+	message(FATAL_ERROR "Unkown platform. Cannot determine cpe (common platform enumeration)")
 endif()
 
 # Sets the given variable to a unique SPDIXID-compatible value.
@@ -368,6 +379,11 @@ macro(_sbom_generate_document_template)
 		set(_pkg_purpose_field_txt "\nPrimaryPackagePurpose: ${_arg_sbom_gen_PACKAGE_PURPOSE}")
 	endif()
 
+	set(_cpeType "cpe22Type")
+	if("${SBOM_CPE}" MATCHES "cpe:2\.3")
+		set(_cpeType "cpe23Type")
+	endif()
+
 	file(
 		GENERATE
 		OUTPUT "${SBOM_SNIPPET_DIR}/${_sbom_document_template}"
@@ -399,7 +415,7 @@ RelationshipComment: <text>SPDXRef-${_arg_sbom_gen_PACKAGE_NAME} is built by com
 
 PackageName: ${_arg_sbom_gen_PACKAGE_NAME}
 SPDXID: SPDXRef-${_arg_sbom_gen_PACKAGE_NAME}
-ExternalRef: SECURITY cpe23Type ${SBOM_CPE}
+ExternalRef: SECURITY ${_cpeType} ${SBOM_CPE}
 ExternalRef: PACKAGE-MANAGER purl pkg:supplier/${_pkg_creator_name}/${_arg_sbom_gen_PACKAGE_NAME}@${_arg_sbom_gen_PACKAGE_VERSION}
 PackageVersion: ${_arg_sbom_gen_PACKAGE_VERSION}
 PackageFileName: ${_arg_sbom_gen_PACKAGE_FILENAME}\
@@ -821,7 +837,7 @@ function(_sbom_add_pkg_content PATH)
 	_sbom_parse_license("CONCLUDED;${_arg_add_pkg_content_LICENSE}" _arg_add_pkg_content_LICENSE_CONCLUDED _arg_add_pkg_content_LICENSE_DECLARED _arg_add_pkg_content_LICENSE_COMMENT)
 	string(APPEND _fields "\nLicenseConcluded: ${_arg_add_pkg_content_LICENSE_CONCLUDED}")
 	if(DEFINED _arg_add_pkg_content_LICENSE_COMMENT)
-		string(APPEND _fields "\nLicenseComments: ${_arg_add_pkg_content_LICENSE_COMMENT}")
+		string(APPEND _fields "\nLicenseComments: <text>${_arg_add_pkg_content_LICENSE_COMMENT}</text>")
 	endif()
 
 	if(DEFINED _arg_add_pkg_content_FILETYPE)
