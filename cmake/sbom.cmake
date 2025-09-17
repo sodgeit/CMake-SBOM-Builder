@@ -788,14 +788,13 @@ endmacro()
 function(_sbom_add_pkg_content PATH)
 	set(options OPTIONAL FILE DIR)
 	set(oneValueArgs SPDXID
-					 RELATIONSHIP
 					 COPYRIGHT
 					 COMMENT
 					 NOTICE
 					 CONTRIBUTORS
 					 ATTRIBUTION
 					 )
-	set(multiValueArgs FILETYPE CHECKSUM LICENSE)
+	set(multiValueArgs FILETYPE CHECKSUM LICENSE RELATIONSHIP)
 	cmake_parse_arguments(_arg_add_pkg_content "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
 	_sbom_builder_is_setup()
@@ -809,6 +808,7 @@ function(_sbom_add_pkg_content PATH)
 		CHECK "${_arg_add_pkg_content_SPDXID}"
 		HINTS "SPDXRef-${PATH}"
 	)
+	set(SBOM_LAST_SPDXID "${_arg_add_pkg_content_SPDXID}")
 	set(SBOM_LAST_SPDXID "${_arg_add_pkg_content_SPDXID}" PARENT_SCOPE)
 
 	set(_fields "")
@@ -870,17 +870,16 @@ function(_sbom_add_pkg_content PATH)
 	endif()
 
 	if(NOT DEFINED _arg_add_pkg_content_RELATIONSHIP)
-		set(_arg_add_pkg_content_RELATIONSHIP "SPDXRef-${_sbom_project} CONTAINS ${_arg_add_pkg_content_SPDXID}")
-	else()
-		string(REPLACE "@SBOM_LAST_SPDXID@" "${_arg_add_pkg_content_SPDXID}" _arg_add_pkg_content_RELATIONSHIP "${_arg_add_pkg_content_RELATIONSHIP}")
+		set(_arg_add_pkg_content_RELATIONSHIP
+			"SPDXRef-${_sbom_project} CONTAINS @SBOM_LAST_SPDXID@")
 	endif()
 
 	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 
-	_sbom_append_sbom_snippet("${_arg_add_pkg_content_SPDXID}.cmake")
+	_sbom_append_sbom_snippet("${SBOM_LAST_SPDXID}.cmake")
 	file(
 		GENERATE
-		OUTPUT ${_sbom_snippet_dir}/${_arg_add_pkg_content_SPDXID}.cmake
+		OUTPUT ${_sbom_snippet_dir}/${SBOM_LAST_SPDXID}.cmake
 		CONTENT
 		"
 cmake_policy(SET CMP0011 NEW)
@@ -898,39 +897,46 @@ else()
 	set(_files \"${PATH}\")
 endif()
 
+set(relationships \"${_arg_add_pkg_content_RELATIONSHIP}\")
+
 if((NOT ADDING_DIR) AND (NOT EXISTS \${CMAKE_INSTALL_PREFIX}/${PATH}))
 	if(NOT ${_arg_add_pkg_content_OPTIONAL})
 		message(FATAL_ERROR \"Cannot find ./${PATH}\")
 	endif()
-else()
-	set(_count 0)
-	set(_rel \"${_arg_add_pkg_content_RELATIONSHIP}\")
-	set(_id \"${_arg_add_pkg_content_SPDXID}\")
-	foreach(_f IN LISTS _files)
-		if(ADDING_DIR)
-			set(_rel \"${_arg_add_pkg_content_RELATIONSHIP}-\${_count}\")
-			set(_id \"${_arg_add_pkg_content_SPDXID}-\${_count}\")
-			math(EXPR _count \"\${_count} + 1\")
+endif()
+
+set(_count 0)
+foreach(_f IN LISTS _files)
+	set(_id \"${SBOM_LAST_SPDXID}\")
+	if(ADDING_DIR)
+		set(_id \"${SBOM_LAST_SPDXID}-\${_count}\")
+		math(EXPR _count \"\${_count} + 1\")
+	endif()
+
+	set(_relations \"\")
+	foreach(_rel IN LISTS relationships)
+		string(REPLACE \"@SBOM_LAST_SPDXID@\" \"\${_id}\" _tmp \"\${_rel}\")
+		string(APPEND _relations \"\\nRelationship: \${_tmp}\")
+	endforeach()
+
+	set(_checksum_fields \"\")
+	foreach(_algo ${_hash_algo})
+		file(\${_algo} \${CMAKE_INSTALL_PREFIX}/\${_f} _hash)
+		if(\"\${_algo}\" STREQUAL \"SHA1\")
+			list(APPEND SBOM_VERIFICATION_CODES \${_hash})
 		endif()
-		set(_checksum_fields \"\")
-		foreach(_algo ${_hash_algo})
-			file(\${_algo} \${CMAKE_INSTALL_PREFIX}/\${_f} _hash)
-			if(\"\${_algo}\" STREQUAL \"SHA1\")
-				list(APPEND SBOM_VERIFICATION_CODES \${_hash})
-			endif()
-			string(APPEND _checksum_fields \"\\nFileChecksum: \${_algo}: \${_hash}\")
-		endforeach()
-		file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
+		string(APPEND _checksum_fields \"\\nFileChecksum: \${_algo}: \${_hash}\")
+	endforeach()
+	file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
 \"
 FileName: ./\${_f}
 SPDXID: \${_id}\
 ${_fields}\
-\${_checksum_fields}
-Relationship: \${_rel}
+\${_checksum_fields}\
+\${_relations}
 \"
-	)
-	endforeach()
-endif()
+)
+endforeach()
 	"
 	)
 
@@ -988,7 +994,6 @@ endfunction()
 function(sbom_add_package NAME)
 	set(oneValueArgs
 		SPDXID
-		RELATIONSHIP
 		VERSION
 		FILENAME
 		DOWNLOAD
@@ -1000,6 +1005,7 @@ function(sbom_add_package NAME)
 		SUPPLIER
 		ORIGINATOR
 		CHECKSUM
+		RELATIONSHIP
 		EXTREF
 		LICENSE
 		NOTES
@@ -1023,6 +1029,7 @@ function(sbom_add_package NAME)
 		HINTS "SPDXRef-${NAME}"
 	)
 
+	set(SBOM_LAST_SPDXID ${_arg_add_pkg_SPDXID})
 	set(SBOM_LAST_SPDXID ${_arg_add_pkg_SPDXID} PARENT_SCOPE)
 
 	set(_fields "PackageName: ${NAME}\nSPDXID: ${_arg_add_pkg_SPDXID}")
@@ -1151,10 +1158,14 @@ function(sbom_add_package NAME)
 
 	if(NOT DEFINED _arg_add_pkg_RELATIONSHIP)
 		set(_arg_add_pkg_RELATIONSHIP "SPDXRef-${_sbom_project} DEPENDS_ON ${_arg_add_pkg_SPDXID}")
+		string(APPEND _fields "\nRelationship: ${_arg_add_pkg_RELATIONSHIP}")
 	else()
-		string(REPLACE "@SBOM_LAST_SPDXID@" "${_arg_add_pkg_SPDXID}" _arg_add_pkg_RELATIONSHIP "${_arg_add_pkg_RELATIONSHIP}")
+		foreach(_relation IN LISTS _arg_add_pkg_RELATIONSHIP)
+			string(REPLACE "@SBOM_LAST_SPDXID@" "${SBOM_LAST_SPDXID}" _tmp "${_relation}")
+			string(APPEND _fields "\nRelationship: ${_tmp}")
+		endforeach()
 	endif()
-	string(APPEND _fields "\nRelationship: ${_arg_add_pkg_RELATIONSHIP}\nRelationship: ${_arg_add_pkg_SPDXID} CONTAINS NOASSERTION")
+	string(APPEND _fields "\nRelationship: ${_arg_add_pkg_SPDXID} CONTAINS NOASSERTION")
 
 	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 
@@ -1171,15 +1182,14 @@ ${_fields}
 			)
 			"
 	)
-
-	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
 endfunction()
 
 # Add a reference to a package in an external file.
 function(sbom_add_external ID PATH)
-	set(oneValueArgs RENAME SPDXID RELATIONSHIP)
+	set(oneValueArgs RENAME SPDXID)
+	set(multiValueArgs RELATIONSHIP)
 	cmake_parse_arguments(
-		_arg_add_extern "" "${oneValueArgs}" "" ${ARGN}
+		_arg_add_extern "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
 	)
 
 	_sbom_builder_is_setup()
@@ -1199,26 +1209,28 @@ function(sbom_add_external ID PATH)
 		message(FATAL_ERROR "Invalid DocumentRef \"${_arg_add_extern_SPDXID}\"")
 	endif()
 
+	set(SBOM_LAST_SPDXID "${_arg_add_extern_SPDXID}")
 	set(SBOM_LAST_SPDXID "${_arg_add_extern_SPDXID}" PARENT_SCOPE)
 
 	get_filename_component(sbom_dir "${_sbom}" DIRECTORY)
 
-	if("${_arg_add_extern_RELATIONSHIP}" STREQUAL "")
-		set(_arg_add_extern_RELATIONSHIP
-			"SPDXRef-${_sbom_project} DEPENDS_ON ${_arg_add_extern_SPDXID}:${ID}"
-		)
+	set(_fields)
+	if(NOT DEFINED _arg_add_extern_RELATIONSHIP)
+		set(_arg_add_extern_RELATIONSHIP "SPDXRef-${_sbom_project} DEPENDS_ON ${SBOM_LAST_SPDXID}:${ID}")
+		string(APPEND _fields "\nRelationship: ${_arg_add_extern_RELATIONSHIP}")
 	else()
-		string(REPLACE "@SBOM_LAST_SPDXID@" "${_arg_add_extern_SPDXID}"
-			_arg_add_extern_RELATIONSHIP "${_arg_add_extern_RELATIONSHIP}"
-		)
+		foreach(_relation IN LISTS _arg_add_extern_RELATIONSHIP)
+			string(REPLACE "@SBOM_LAST_SPDXID@" "${SBOM_LAST_SPDXID}" _tmp "${_relation}")
+			string(APPEND _fields "\nRelationship: ${_tmp}")
+		endforeach()
 	endif()
 
 	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 
-	_sbom_append_sbom_snippet("${_arg_add_extern_SPDXID}.cmake")
+	_sbom_append_sbom_snippet("${SBOM_LAST_SPDXID}.cmake")
 	file(
 		GENERATE
-		OUTPUT ${_sbom_snippet_dir}/${_arg_add_extern_SPDXID}.cmake
+		OUTPUT ${_sbom_snippet_dir}/${SBOM_LAST_SPDXID}.cmake
 		CONTENT
 "file(SHA1 \"${PATH}\" ext_sha1)
 file(READ \"${PATH}\" ext_content)
@@ -1238,7 +1250,7 @@ string(REGEX REPLACE
 
 list(APPEND SBOM_EXT_DOCS \"ExternalDocumentRef: ${_arg_add_extern_SPDXID} \${ext_ns} SHA1: \${ext_sha1}\")
 
-file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"Relationship: ${_arg_add_extern_RELATIONSHIP}\\n\")
+file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"${_fields}\")
 "
 	)
 endfunction()
