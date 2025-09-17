@@ -282,7 +282,7 @@ elseif(UNIX)
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
 	set(SBOM_CPE "cpe:2.3:h:arm:arm:-:*:*:*:*:*:*:*")
 else()
-	message(FATAL_ERROR "Unsupported platform")
+	message(FATAL_ERROR "Unkown platform. Cannot determine cpe (common platform enumeration)")
 endif()
 
 # Sets the given variable to a unique SPDIXID-compatible value.
