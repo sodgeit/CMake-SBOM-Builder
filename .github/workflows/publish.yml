@@ -16,12 +16,13 @@ jobs:
         run: |
           mkdir dist
           sed -e "s/0.0.0-development-version/${GITHUB_REF/refs\/tags\/v}/g" cmake/sbom.cmake > dist/sbom.cmake
+          sha256sum dist/sbom.cmake > dist/sbom.cmake.sha256
 
       - name: Upload sbom.cmake to release
         uses: svenstaro/upload-release-action@v1-release
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref }}
-          file: dist/sbom.cmake
+          file: dist/sbom.cmake, dist/sbom.cmake.sha256
           file_glob: true
           overwrite: true
