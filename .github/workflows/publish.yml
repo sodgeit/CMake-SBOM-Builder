@@ -23,6 +23,6 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref }}
-          file: dist/sbom.cmake, dist/sbom.cmake.sha256
+          file: dist/*
           file_glob: true
           overwrite: true
