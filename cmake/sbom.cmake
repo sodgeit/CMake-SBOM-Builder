@@ -1210,6 +1210,13 @@ function(sbom_add_external ID PATH)
 
 	_sbom_builder_is_setup()
 
+	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
+	get_property(_sbom_project GLOBAL PROPERTY sbom_package_spdxid)
+	
+	if(NOT IS_ABSOLUTE "${_sbom}")
+		get_filename_component(_sbom "${CMAKE_BINARY_DIR}/${_sbom}" ABSOLUTE)
+	endif()
+
 	if(_arg_add_extern_UNPARSED_ARGUMENTS)
 		message(FATAL_ERROR "Unknown arguments: ${_arg_add_extern_UNPARSED_ARGUMENTS}")
 	endif()
