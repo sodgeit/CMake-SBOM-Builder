@@ -676,6 +676,9 @@ function(sbom_generate)
 		endif()
 		set(_arg_sbom_gen_OUTPUT "./${CMAKE_INSTALL_DATAROOTDIR}/${_safe_package_name}-sbom-${_pkg_version}.spdx")
 	endif()
+	if(NOT IS_ABSOLUTE "${_arg_sbom_gen_OUTPUT}")
+		set(_arg_sbom_gen_OUTPUT "\${CMAKE_INSTALL_PREFIX}/${_arg_sbom_gen_OUTPUT}")
+	endif()
 
 	if(NOT DEFINED _arg_sbom_gen_PACKAGE_VERSION)
 		set(_arg_sbom_gen_PACKAGE_VERSION ${GIT_VERSION})
@@ -723,11 +726,6 @@ function(sbom_generate)
 
 	set(_sbom_intermediate_file "$<CONFIG>/sbom.spdx.in")
 	set(_sbom_document_template "SPDXRef-DOCUMENT.spdx.in")
-	set(_sbom_export_path "${_arg_sbom_gen_OUTPUT}")
-
-	if(NOT IS_ABSOLUTE "${_arg_sbom_gen_OUTPUT}")
-		set(_sbom_export_path "\${CMAKE_INSTALL_PREFIX}/${_arg_sbom_gen_OUTPUT}")
-	endif()
 
 	_sbom_generate_document_template()
 	set(SBOM_LAST_SPDXID "SPDXRef-${_arg_sbom_gen_PACKAGE_NAME}" PARENT_SCOPE)
@@ -736,7 +734,7 @@ function(sbom_generate)
 	file(GENERATE
 		OUTPUT ${SBOM_SNIPPET_DIR}/setup.cmake
 		CONTENT "
-set(SBOM_EXPORT_FILENAME \"${_sbom_export_path}\")
+set(SBOM_EXPORT_FILENAME \"${_arg_sbom_gen_OUTPUT}\")
 set(SBOM_BINARY_DIR \"${SBOM_BINARY_DIR}\")
 set(SBOM_SNIPPET_DIR \"${SBOM_SNIPPET_DIR}\")
 set(SBOM_DOCUMENT_TEMPLATE \"${_sbom_document_template}\")
@@ -1210,13 +1208,6 @@ function(sbom_add_external ID PATH)
 
 	_sbom_builder_is_setup()
 
-	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
-	get_property(_sbom_project GLOBAL PROPERTY sbom_package_spdxid)
-	
-	if(NOT IS_ABSOLUTE "${_sbom}")
-		get_filename_component(_sbom "${CMAKE_BINARY_DIR}/${_sbom}" ABSOLUTE)
-	endif()
-
 	if(_arg_add_extern_UNPARSED_ARGUMENTS)
 		message(FATAL_ERROR "Unknown arguments: ${_arg_add_extern_UNPARSED_ARGUMENTS}")
 	endif()
@@ -1234,6 +1225,9 @@ function(sbom_add_external ID PATH)
 
 	set(SBOM_LAST_SPDXID "${_arg_add_extern_SPDXID}")
 	set(SBOM_LAST_SPDXID "${_arg_add_extern_SPDXID}" PARENT_SCOPE)
+
+	get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
+	get_property(_sbom_project GLOBAL PROPERTY sbom_package_spdxid)
 
 	get_filename_component(sbom_dir "${_sbom}" DIRECTORY)
 
