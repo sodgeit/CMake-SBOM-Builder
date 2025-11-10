@@ -1,0 +1,42 @@
+SPDXVersion: SPDX-2.3
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: myother.spdx
+DocumentNamespace: https://www.myother.com/spdxdocs/myother-v0.1.0
+Creator: Organization: myother
+Creator: Tool: CMake-SBOM-Builder-0.0.0-development-version
+CreatorComment: <text>This SPDX document was created from CMake 3.31.6, using CMake-SBOM-Builder from https://github.com/sodgeit/CMake-SBOM-Builder</text>
+Created: 2025-11-08T17:26:27Z
+
+PackageName: GNU
+SPDXID: SPDXRef-compiler
+PackageVersion: 13.3.0
+PackageDownloadLocation: NOASSERTION
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+PackageSupplier: Organization: Anonymous
+FilesAnalyzed: false
+PackageSummary: <text>The compiler as identified by CMake, running on Linux (x86_64)</text>
+PrimaryPackagePurpose: APPLICATION
+Relationship: SPDXRef-compiler CONTAINS NOASSERTION
+Relationship: SPDXRef-compiler BUILD_DEPENDENCY_OF SPDXRef-minimal
+RelationshipComment: <text>SPDXRef-minimal is built by compiler GNU (/usr/bin/c++) version 13.3.0</text>
+
+PackageName: myother
+SPDXID: SPDXRef-minimal
+ExternalRef: SECURITY cpe23Type cpe:2.3:o:*:many_linux:-:*:*:*:*:*:x86_64:*
+ExternalRef: PACKAGE-MANAGER purl pkg:supplier/myother/myother@v0.1.0
+PackageVersion: v0.1.0
+PackageFileName: myother-v0.1.0.zip
+PackageSupplier: Organization: myother-organization
+PackageDownloadLocation: NOASSERTION
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: 2025 myother
+PackageHomePage: https://www.myother.com
+PackageComment: <text>Built by CMake 3.31.6 with  configuration for Linux (x86_64)</text>
+PackageVerificationCode: da39a3ee5e6b4b0d3255bfef95601890afd80709
+BuiltDate: 2025-11-08T17:26:27Z
+ReleaseDate: 2025-11-08T17:26:27Z
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-minimal
