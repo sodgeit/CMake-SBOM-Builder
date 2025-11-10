@@ -23,9 +23,9 @@ project(${name})"
 	set(TEST_VERIFY
 "install(CODE
 	\"
-	message(STATUS \\\"Verifying:  \${CMAKE_INSTALL_PREFIX}/\${SBOM_FILENAME}\\\")
+	message(STATUS \\\"Verifying:  \${SBOM_FILENAME}\\\")
 	execute_process(
-		COMMAND \\\"pyspdxtools\\\" \\\"-i\\\" \\\"\${CMAKE_INSTALL_PREFIX}/\${SBOM_FILENAME}\\\"
+		COMMAND \\\"pyspdxtools\\\" \\\"-i\\\" \\\"\${SBOM_FILENAME}\\\"
 		ERROR_VARIABLE _output
 	)
 	if(NOT _output STREQUAL \\\"\\\")
