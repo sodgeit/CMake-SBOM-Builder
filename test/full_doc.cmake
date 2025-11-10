@@ -14,6 +14,7 @@ sbom_generate(
 	CREATOR ORGANIZATION FullDocTest
 	PACKAGE_URL https://www.fullDocTest.com
 	PACKAGE_LICENSE MIT
+	PACKAGE_CPE cpe:2.3:o:*:some-software:some-framework:*:*:*:*:*:x86_64:* #this is not a valid cpe :)
 )
 
 sbom_finalize()

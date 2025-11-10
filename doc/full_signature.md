@@ -23,6 +23,7 @@ sbom_generate(
 					  CONTAINER|OPERATING-SYSTEM|DEVICE|
 					  FIRMWARE|SOURCE|ARCHIVE|
 					  FILE|INSTALL|OTHER>...]
+	[PACKAGE_CPE <cpe>]
 	[OUTPUT <filename>]
 	[NAMESPACE <URI>]
 )
@@ -83,6 +84,11 @@ sbom_generate(
     - `sbom_generate(... PACKAGE_PURPOSE "APPLICATION" "FIRMWARE" ...)`
     - `sbom_generate(... PACKAGE_PURPOSE "FILE" "SOURCE" "LIBRARY" ...)`
   - See [SPDX clause 7.24](https://spdx.github.io/spdx-spec/v2.3/package-information/#724-primary-package-purpose-field) for more information.
+- `PACKAGE_CPE`:
+  - Optional. CPE string describing the package
+  - Usage:
+    - `sbom_generate(... PACKAGE_CPE "cpe:2.3:o:*:some-software:some-framework:*:*:*:*:*:x86_64:*")`
+  - cpe string is not validated
 - `OUTPUT`: Output filename + path.
   - Can be absolute or relative to `CMAKE_INSTALL_PREFIX`.
   - Default location is `${CMAKE_INSTALL_PREFIX}/share/${PACKAGE_NAME}-sbom-${GIT_VERSION_PATH}.spdx`.
