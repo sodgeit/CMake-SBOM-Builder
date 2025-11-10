@@ -233,58 +233,6 @@ $<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>://>#define ${PROJECT_NAME_UC}_VERSION_SU
 
 endfunction()
 
-# Common Platform Enumeration: https://nvd.nist.gov/products/cpe
-# TODO: This detection can still be improved.
-
-if(WIN32)
-	if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
-		set(_arch "x64")
-	elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "IA64")
-		set(_arch "x64")
-	elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ARM64")
-		set(_arch "arm64")
-	elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "X86")
-		set(_arch "x86")
-	elseif(CMAKE_CXX_COMPILER MATCHES "64")
-		set(_arch "x64")
-	elseif(CMAKE_CXX_COMPILER MATCHES "86")
-		set(_arch "x86")
-	else()
-		set(_arch "*")
-	endif()
-
-	if("${CMAKE_SYSTEM_VERSION}" STREQUAL "6.1")
-		set(SBOM_CPE "cpe:2.3:o:microsoft:windows_7:-:*:*:*:*:*:${_arch}:*")
-	elseif("${CMAKE_SYSTEM_VERSION}" STREQUAL "6.2")
-		set(SBOM_CPE "cpe:2.3:o:microsoft:windows_8:-:*:*:*:*:*:${_arch}:*")
-	elseif("${CMAKE_SYSTEM_VERSION}" STREQUAL "6.3")
-		set(SBOM_CPE "cpe:2.3:o:microsoft:windows_8.1:-:*:*:*:*:*:${_arch}:*")
-	# first windows 11 had version 22000
-	# https://en.wikipedia.org/wiki/Windows_11_version_history
-	elseif("${CMAKE_SYSTEM_VERSION}" VERSION_LESS 10.0.22000)
-		set(SBOM_CPE "cpe:2.3:o:microsoft:windows_10:-:*:*:*:*:*:${_arch}:*")
-	else()
-		set(SBOM_CPE "cpe:2.3:o:microsoft:windows_11:-:*:*:*:*:*:${_arch}:*")
-	endif()
-elseif(APPLE)
-	set(SBOM_CPE "cpe:2.3:o:apple:mac_os:*:*:*:*:*:*:${CMAKE_SYSTEM_PROCESSOR}:*")
-elseif(UNIX)
-	set(SBOM_CPE "cpe:2.3:o:*:many_linux:-:*:*:*:*:*:${CMAKE_SYSTEM_PROCESSOR}:*")
-	if(EXISTS /etc/os-release)
-		file(READ /etc/os-release _os_release_content)
-		string(REPLACE "\n" ";" _os_release_content ${_os_release_content})
-		foreach(line ${_os_release_content})
-			if (line MATCHES "^CPE_NAME=\"(.+)\"")
-				set(SBOM_CPE "${CMAKE_MATCH_1}")
-			endif()
-		endforeach()
-	endif()
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
-	set(SBOM_CPE "cpe:2.3:h:arm:arm:-:*:*:*:*:*:*:*")
-else()
-	message(FATAL_ERROR "Unkown platform. Cannot determine cpe (common platform enumeration)")
-endif()
-
 # Sets the given variable to a unique SPDIXID-compatible value.
 function(sbom_spdxid)
 	set(oneValueArgs VARIABLE CHECK)
@@ -362,12 +310,12 @@ macro(_sbom_generate_document_template)
 	endif()
 
 	set(_pkg_summary_field FALSE)
-	set(_pkg_desc_field FALSE)
 	if(DEFINED _arg_sbom_gen_PACKAGE_SUMMARY)
 		set(_pkg_summary_field TRUE)
 		set(_pkg_summary_field_txt "PackageSummary: <text$<ANGLE-R>${_arg_sbom_gen_PACKAGE_SUMMARY}</text$<ANGLE-R>")
 	endif()
 
+	set(_pkg_desc_field FALSE)
 	if(DEFINED _arg_sbom_gen_PACKAGE_DESC)
 		set(_pkg_desc_field TRUE)
 		set(_pkg_desc_field_txt "PackageDescription: <text$<ANGLE-R>${_arg_sbom_gen_PACKAGE_DESC}</text$<ANGLE-R>")
@@ -379,10 +327,17 @@ macro(_sbom_generate_document_template)
 		set(_pkg_purpose_field_txt "\nPrimaryPackagePurpose: ${_arg_sbom_gen_PACKAGE_PURPOSE}")
 	endif()
 
-	set(_cpeType "cpe22Type")
-	if("${SBOM_CPE}" MATCHES "cpe:2\.3")
-		set(_cpeType "cpe23Type")
+	set(_pkg_cpe_field FALSE)
+	if(DEFINED _arg_sbom_gen_PACKAGE_CPE)
+		set(_cpeType "cpe22Type")
+		if("${_arg_sbom_gen_PACKAGE_CPE}" MATCHES "cpe:2\.3")
+			set(_cpeType "cpe23Type")
+		endif()
+
+		set(_pkg_cpe_field TRUE)
+		set(_pkg_cpe_field_txt "\nExternalRef: SECURITY ${_cpeType} ${_arg_sbom_gen_PACKAGE_CPE}")
 	endif()
+
 
 	file(
 		GENERATE
@@ -414,8 +369,8 @@ Relationship: SPDXRef-compiler BUILD_DEPENDENCY_OF SPDXRef-${_arg_sbom_gen_PACKA
 RelationshipComment: <text>SPDXRef-${_arg_sbom_gen_PACKAGE_NAME} is built by compiler ${CMAKE_CXX_COMPILER_ID} (${CMAKE_CXX_COMPILER}) version ${CMAKE_CXX_COMPILER_VERSION}</text>
 
 PackageName: ${_arg_sbom_gen_PACKAGE_NAME}
-SPDXID: SPDXRef-${_arg_sbom_gen_PACKAGE_NAME}
-ExternalRef: SECURITY ${_cpeType} ${SBOM_CPE}
+SPDXID: SPDXRef-${_arg_sbom_gen_PACKAGE_NAME}\
+$<$<BOOL:${_pkg_cpe_field}>:${_pkg_cpe_field_txt}>
 ExternalRef: PACKAGE-MANAGER purl pkg:supplier/${_pkg_creator_name}/${_arg_sbom_gen_PACKAGE_NAME}@${_arg_sbom_gen_PACKAGE_VERSION}
 PackageVersion: ${_arg_sbom_gen_PACKAGE_VERSION}
 PackageFileName: ${_arg_sbom_gen_PACKAGE_FILENAME}\
@@ -577,6 +532,7 @@ function(sbom_generate)
 		PACKAGE_URL
 		PACKAGE_LICENSE
 		PACKAGE_COPYRIGHT
+		PACKAGE_CPE
 	)
 	set(multiValueArgs CREATOR PACKAGE_NOTES PACKAGE_PURPOSE)
 	cmake_parse_arguments(
