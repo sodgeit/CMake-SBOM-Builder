@@ -19,12 +19,12 @@ add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/other ${CMAKE_CURRENT_BINARY_DIR}/o
 
 # Last generated SBOM file. It's valid until the next sbom_generate().
 # this is just used for testing purposes. Do not rely on this in production code.
-get_property(_sbom GLOBAL PROPERTY SBOM_FILENAME)
+get_property(_myother_sbom GLOBAL PROPERTY SBOM_FILENAME)
 
 sbom_generate(CREATOR PERSON ExternalTest PACKAGE_URL https://www.externalTest.com PACKAGE_LICENSE MIT)
-sbom_add_external(SPDXRef-other "${_sbom}")
+sbom_add_external(SPDXRef-other "${_myother_sbom}")
 
-sbom_add_external(SPDXRef-other "${_sbom}"
+sbom_add_external(SPDXRef-other "${_myother_sbom}"
 	RELATIONSHIP "\@SBOM_LAST_SPDXID\@:SPDXRef-other VARIANT_OF ${SBOM_LAST_SPDXID}:SPDXRef-other"
 )
 sbom_finalize()
