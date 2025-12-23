@@ -233,6 +233,10 @@ $<$<NOT:$<BOOL:${GIT_VERSION_TRIPLET}>>://>#define ${PROJECT_NAME_UC}_VERSION_SU
 
 endfunction()
 
+macro(_sbom_log log_level log_message)
+	message(${log_level} "SBOM-Builder: ${log_message}")
+endmacro()
+
 # Sets the given variable to a unique SPDIXID-compatible value.
 function(sbom_spdxid)
 	set(oneValueArgs VARIABLE CHECK)
@@ -243,11 +247,11 @@ function(sbom_spdxid)
 	)
 
 	if(SBOM_SPDXID_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${SBOM_SPDXID_UNPARSED_ARGUMENTS}")
+		_sbom_log(FATAL_ERROR "Unknown arguments: ${SBOM_SPDXID_UNPARSED_ARGUMENTS}")
 	endif()
 
 	if(NOT DEFINED SBOM_SPDXID_VARIABLE)
-		message(FATAL_ERROR "Missing VARIABLE")
+		_sbom_log(FATAL_ERROR "Missing VARIABLE")
 	endif()
 
 	if("${SBOM_SPDXID_CHECK}" STREQUAL "")
@@ -274,7 +278,7 @@ function(sbom_spdxid)
 	endif()
 
 	if(NOT "${_id}" MATCHES "^SPDXRef-[-a-zA-Z0-9]+$")
-		message(FATAL_ERROR "Invalid SPDXID \"${_id}\"")
+		_sbom_log(FATAL_ERROR "Invalid SPDXID \"${_id}\"")
 	endif()
 
 	set(${SBOM_SPDXID_VARIABLE} "${_id}" PARENT_SCOPE)
@@ -404,7 +408,7 @@ function(_sbom_parse_package_supplier pkg_supplier_arg out_supplier_type out_sup
 	cmake_parse_arguments(_arg_supplier "NOASSERTION" "ORGANIZATION;PERSON;EMAIL" "" ${pkg_supplier_arg})
 
 	if(_arg_supplier_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown subarguments passed to SUPPLIER: ${_arg_supplier_UNPARSED_ARGUMENTS}")
+		_sbom_log(FATAL_ERROR "Unknown subarguments passed to SUPPLIER: ${_arg_supplier_UNPARSED_ARGUMENTS}")
 	endif()
 
 	if(_arg_supplier_NOASSERTION)
@@ -412,9 +416,9 @@ function(_sbom_parse_package_supplier pkg_supplier_arg out_supplier_type out_sup
 		return()
 	endif()
 	if((NOT DEFINED _arg_supplier_PERSON) AND (NOT DEFINED _arg_supplier_ORGANIZATION))
-		message(FATAL_ERROR "Missing <NOASSERTION|PERSON|ORGANIZATION> <name> for argument SUPPLIER.")
+		_sbom_log(FATAL_ERROR "Missing <NOASSERTION|PERSON|ORGANIZATION> <name> for argument SUPPLIER.")
 	elseif(DEFINED _arg_supplier_PERSON AND DEFINED _arg_supplier_ORGANIZATION)
-		message(FATAL_ERROR "Specify either PERSON or ORGANIZATION, not both.")
+		_sbom_log(FATAL_ERROR "Specify either PERSON or ORGANIZATION, not both.")
 	endif()
 
 	if(DEFINED _arg_supplier_PERSON)
@@ -434,7 +438,7 @@ function(_sbom_parse_license pkg_license_arg out_license_concluded out_license_d
 	cmake_parse_arguments(_arg_license "" "CONCLUDED;DECLARED;COMMENT" "" ${pkg_license_arg})
 
 	if(_arg_license_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown subarguments for LICENSE: ${_arg_license_UNPARSED_ARGUMENTS}")
+		_sbom_log(FATAL_ERROR "Unknown subarguments for LICENSE: ${_arg_license_UNPARSED_ARGUMENTS}")
 	endif()
 
 	if(DEFINED _arg_license_CONCLUDED)
@@ -459,14 +463,14 @@ function(_sbom_parse_dates pkg_dates_arg out_BUILD out_RELEASE out_VALID_UNTIL)
 	cmake_parse_arguments(_arg_dates "" "${oneValueArgs}" "" ${pkg_dates_arg})
 
 	if(_arg_dates_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown subarguments for DATE: ${_arg_dates_UNPARSED_ARGUMENTS}")
+		_sbom_log(FATAL_ERROR "Unknown subarguments for DATE: ${_arg_dates_UNPARSED_ARGUMENTS}")
 	endif()
 
 	foreach(_date ${oneValueArgs})
 		if(DEFINED _arg_dates_${_date})
 			string(REGEX MATCH "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" _arg_dates_${_date} ${_arg_dates_${_date}})
 			if(NOT _arg_dates_${_date})
-				message(FATAL_ERROR "Invalid date format for ${_date}: ${_arg_dates_${_date}}")
+				_sbom_log(FATAL_ERROR "Invalid date format for ${_date}: ${_arg_dates_${_date}}")
 			endif()
 			set(${out_${_date}} "${_arg_dates_${_date}}" PARENT_SCOPE)
 		endif()
@@ -488,7 +492,7 @@ function(_sbom_parse_package_purpose pkg_purpose_arg out_purpose)
 	set(options "APPLICATION;FRAMEWORK;LIBRARY;CONTAINER;OPERATING-SYSTEM;DEVICE;FIRMWARE;SOURCE;ARCHIVE;FILE;INSTALL;OTHER")
 	cmake_parse_arguments(_arg "${options}" "" "" ${pkg_purpose_arg})
 	if(_arg_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown keywords for PURPOSE: ${_arg_UNPARSED_ARGUMENTS}")
+		_sbom_log(FATAL_ERROR "Unknown keywords for PURPOSE: ${_arg_UNPARSED_ARGUMENTS}")
 	endif()
 
 	# only one option is allowed
@@ -506,7 +510,7 @@ function(_sbom_parse_filetype file_type_arg out_filetype_list)
 	set(valid_entries "SOURCE;BINARY;ARCHIVE;APPLICATION;AUDIO;IMAGE;TEXT;VIDEO;DOCUMENTATION;SPDX;OTHER")
 	cmake_parse_arguments(_arg_filetype "${valid_entries}" "" "" ${file_type_arg})
 	if(DEFINED _arg_filetype_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unkown keywords for FILETYPE: ${_arg_filetype_UNPARSED_ARGUMENTS}")
+		_sbom_log(FATAL_ERROR "Unkown keywords for FILETYPE: ${_arg_filetype_UNPARSED_ARGUMENTS}")
 	endif()
 
 	set(${out_filetype_list} "")
@@ -540,7 +544,7 @@ function(sbom_generate)
 	)
 
 	if(_arg_sbom_gen_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${_arg_sbom_gen_UNPARSED_ARGUMENTS}")
+		_sbom_log(FATAL_ERROR "Unknown arguments: ${_arg_sbom_gen_UNPARSED_ARGUMENTS}")
 	endif()
 
 	if(NOT DEFINED GIT_VERSION)
@@ -548,21 +552,21 @@ function(sbom_generate)
 	endif()
 
 	if(NOT DEFINED _arg_sbom_gen_CREATOR)
-		message(FATAL_ERROR "Missing required argument CREATOR.")
+		_sbom_log(FATAL_ERROR "Missing required argument CREATOR.")
 	endif()
 
 	cmake_parse_arguments(_arg_sbom_gen_CREATOR "" "PERSON;ORGANIZATION;EMAIL" "" ${_arg_sbom_gen_CREATOR})
 	if(_arg_sbom_gen_CREATOR_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown subarguments for CREATOR: ${_arg_sbom_gen_CREATOR_UNPARSED_ARGUMENTS}.")
+		_sbom_log(FATAL_ERROR "Unknown subarguments for CREATOR: ${_arg_sbom_gen_CREATOR_UNPARSED_ARGUMENTS}.")
 	endif()
 	if((NOT DEFINED _arg_sbom_gen_CREATOR_PERSON) AND (NOT DEFINED _arg_sbom_gen_CREATOR_ORGANIZATION))
-		message(FATAL_ERROR "Missing <PERSON|ORGANIZATION> <name> for argument CREATOR.")
+		_sbom_log(FATAL_ERROR "Missing <PERSON|ORGANIZATION> <name> for argument CREATOR.")
 	elseif(DEFINED _arg_sbom_gen_CREATOR_PERSON AND DEFINED _arg_sbom_gen_CREATOR_ORGANIZATION)
-		message(FATAL_ERROR "Specify either PERSON or ORGANIZATION, not both.")
+		_sbom_log(FATAL_ERROR "Specify either PERSON or ORGANIZATION, not both.")
 	endif()
 
 	if(NOT DEFINED _arg_sbom_gen_PACKAGE_LICENSE)
-		message(FATAL_ERROR "Missing required argument PACKAGE_LICENSE.")
+		_sbom_log(FATAL_ERROR "Missing required argument PACKAGE_LICENSE.")
 	endif()
 
 	if(NOT DEFINED _arg_sbom_gen_PACKAGE_NAME)
@@ -587,7 +591,7 @@ function(sbom_generate)
 
 	if(NOT DEFINED _arg_sbom_gen_PACKAGE_URL)
 		if(NOT DEFINED _arg_sbom_gen_NAMESPACE)
-			message(FATAL_ERROR "Specify NAMESPACE when PACKAGE_URL is omitted.")
+			_sbom_log(FATAL_ERROR "Specify NAMESPACE when PACKAGE_URL is omitted.")
 		endif()
 	endif()
 
@@ -642,7 +646,7 @@ function(sbom_generate)
 
 	if(NOT DEFINED _arg_sbom_gen_NAMESPACE)
 		if((NOT DEFINED _arg_sbom_gen_PACKAGE_URL) OR (_arg_sbom_gen_PACKAGE_URL STREQUAL "NONE") OR (_arg_sbom_gen_PACKAGE_URL STREQUAL "NOASSERTION"))
-			message(FATAL_ERROR "Specifiy PACKAGE_URL <url> when NAMESPACE is omitted.")
+			_sbom_log(FATAL_ERROR "Specifiy PACKAGE_URL <url> when NAMESPACE is omitted.")
 		endif()
 		set(_arg_sbom_gen_NAMESPACE "${_arg_sbom_gen_PACKAGE_URL}/spdxdocs/${_arg_sbom_gen_PACKAGE_NAME}-${_arg_sbom_gen_PACKAGE_VERSION}")
 	endif()
@@ -690,12 +694,16 @@ function(sbom_generate)
 	file(GENERATE
 		OUTPUT ${SBOM_SNIPPET_DIR}/setup.cmake
 		CONTENT "
+macro(_sbom_log log_level log_message)
+	message(\${log_level} \"SBOM-Builder: \${log_message}\")
+endmacro()
+
 set(SBOM_EXPORT_FILENAME \"${_arg_sbom_gen_OUTPUT}\")
 set(SBOM_BINARY_DIR \"${SBOM_BINARY_DIR}\")
 set(SBOM_SNIPPET_DIR \"${SBOM_SNIPPET_DIR}\")
 set(SBOM_DOCUMENT_TEMPLATE \"${_sbom_document_template}\")
 set(SBOM_EXT_DOCS)
-message(STATUS \"Installing: \${SBOM_EXPORT_FILENAME}\")
+_sbom_log(STATUS \"Installing \${SBOM_EXPORT_FILENAME}\")
 
 # this file is used to collect all SPDX entries before final export
 set(SBOM_INTERMEDIATE_FILE \"\${SBOM_BINARY_DIR}/sbom-build/${_sbom_intermediate_file}\")
@@ -717,14 +725,14 @@ function(sbom_finalize)
 	get_property(_sbom_project GLOBAL PROPERTY sbom_package_spdxid)
 
 	if("${_sbom_project}" STREQUAL "")
-		message(FATAL_ERROR "Call sbom_generate() first")
+		_sbom_log(FATAL_ERROR "Call sbom_generate() first")
 	endif()
 
 	_sbom_append_sbom_snippet("finalize.cmake")
 	file(GENERATE
 		OUTPUT ${_sbom_snippet_dir}/finalize.cmake
 		CONTENT
-"message(STATUS \"Finalizing: \${SBOM_EXPORT_FILENAME}\")
+"_sbom_log(STATUS \"Finalizing \${SBOM_EXPORT_FILENAME}\")
 list(SORT SBOM_VERIFICATION_CODES)
 string(REPLACE \";\" \"\" SBOM_VERIFICATION_CODES \"\${SBOM_VERIFICATION_CODES}\")
 string(TIMESTAMP SBOM_CREATE_DATE UTC)
@@ -751,7 +759,7 @@ macro(_sbom_builder_is_setup)
 	get_property(_sbom_project GLOBAL PROPERTY sbom_package_spdxid)
 
 	if("${_sbom_project}" STREQUAL "")
-		message(FATAL_ERROR "Call sbom_generate() first")
+		_sbom_log(FATAL_ERROR "Call sbom_generate() first")
 	endif()
 endmacro()
 
@@ -770,7 +778,7 @@ function(_sbom_add_pkg_content PATH)
 	_sbom_builder_is_setup()
 
 	if(_arg_add_pkg_content_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${_arg_add_pkg_content_UNPARSED_ARGUMENTS}")
+		_sbom_log(FATAL_ERROR "Unknown arguments: ${_arg_add_pkg_content_UNPARSED_ARGUMENTS}")
 	endif()
 
 	sbom_spdxid(
@@ -808,7 +816,7 @@ function(_sbom_add_pkg_content PATH)
 			if("${_checksum}" IN_LIST _supported_algorithms)
 				list(APPEND _hash_algo "${_checksum}")
 			else()
-				message(FATAL_ERROR "Unsupported checksum algorithm: ${_checksum}")
+				_sbom_log(FATAL_ERROR "Unsupported checksum algorithm: ${_checksum}")
 			endif()
 		endforeach()
 	endif()
@@ -871,7 +879,7 @@ set(relationships \"${_arg_add_pkg_content_RELATIONSHIP}\")
 
 if((NOT ADDING_DIR) AND (NOT EXISTS \${CMAKE_INSTALL_PREFIX}/${PATH}))
 	if(NOT ${_arg_add_pkg_content_OPTIONAL})
-		message(FATAL_ERROR \"Cannot find ./${PATH}\")
+		_sbom_log(FATAL_ERROR \"Cannot find ./${PATH}\")
 	endif()
 endif()
 
@@ -954,7 +962,7 @@ function(sbom_add_target NAME)
 			)
 		endif()
 	else()
-		message(FATAL_ERROR "Unsupported target type ${_type}")
+		_sbom_log(FATAL_ERROR "Unsupported target type ${_type}")
 	endif()
 
 	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
@@ -990,7 +998,7 @@ function(sbom_add_package NAME)
 	_sbom_builder_is_setup()
 
 	if(_arg_add_pkg_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${_arg_add_pkg_UNPARSED_ARGUMENTS}")
+		_sbom_log(FATAL_ERROR "Unknown arguments: ${_arg_add_pkg_UNPARSED_ARGUMENTS}")
 	endif()
 
 	sbom_spdxid(
@@ -1006,7 +1014,7 @@ function(sbom_add_package NAME)
 
 	set(_arg_add_pkg_LICENSE_DECLARED "NOASSERTION")
 	if(NOT DEFINED _arg_add_pkg_LICENSE)
-		message(FATAL_ERROR "Missing LICENSE argument for package ${NAME}.")
+		_sbom_log(FATAL_ERROR "Missing LICENSE argument for package ${NAME}.")
 	endif()
 	_sbom_parse_license("CONCLUDED;${_arg_add_pkg_LICENSE}" _arg_add_pkg_LICENSE_CONCLUDED _arg_add_pkg_LICENSE_DECLARED _arg_add_pkg_LICENSE_COMMENT)
 	string(APPEND _fields "\nPackageLicenseConcluded: ${_arg_add_pkg_LICENSE_CONCLUDED}\nPackageLicenseDeclared: ${_arg_add_pkg_LICENSE_DECLARED}")
@@ -1015,17 +1023,17 @@ function(sbom_add_package NAME)
 	endif()
 
 	if(NOT DEFINED _arg_add_pkg_VERSION)
-		message(FATAL_ERROR "Missing VERSION argument for package ${NAME}.")
+		_sbom_log(FATAL_ERROR "Missing VERSION argument for package ${NAME}.")
 	endif()
 	string(APPEND _fields "\nPackageVersion: ${_arg_add_pkg_VERSION}")
 
 	if(NOT DEFINED _arg_add_pkg_SUPPLIER)
-		message(FATAL_ERROR "Missing SUPPLIER argument for package ${NAME}.")
+		_sbom_log(FATAL_ERROR "Missing SUPPLIER argument for package ${NAME}.")
 	endif()
 	set(_supplier_field_txt "")
 	_sbom_parse_package_supplier("${_arg_add_pkg_SUPPLIER}" _arg_add_pkg_SUPPLIER_TYPE _arg_add_pkg_SUPPLIER_NAME _arg_add_pkg_SUPPLIER_EMAIL)
 	if("${_arg_add_pkg_SUPPLIER_TYPE}" STREQUAL "NOASSERTION")
-		message(FATAL_ERROR "SUPPLIER must be a PERSON or ORGANIZATION.")
+		_sbom_log(FATAL_ERROR "SUPPLIER must be a PERSON or ORGANIZATION.")
 	else()
 		set(_supplier_field_txt "PackageSupplier: ${_arg_add_pkg_SUPPLIER_TYPE} ${_arg_add_pkg_SUPPLIER_NAME}")
 		if(DEFINED _arg_add_pkg_SUPPLIER_EMAIL)
@@ -1165,7 +1173,7 @@ function(sbom_add_external ID PATH)
 	_sbom_builder_is_setup()
 
 	if(_arg_add_extern_UNPARSED_ARGUMENTS)
-		message(FATAL_ERROR "Unknown arguments: ${_arg_add_extern_UNPARSED_ARGUMENTS}")
+		_sbom_log(FATAL_ERROR "Unknown arguments: ${_arg_add_extern_UNPARSED_ARGUMENTS}")
 	endif()
 
 	if("${_arg_add_extern_SPDXID}" STREQUAL "")
@@ -1176,7 +1184,7 @@ function(sbom_add_external ID PATH)
 	endif()
 
 	if(NOT "${_arg_add_extern_SPDXID}" MATCHES "^DocumentRef-[-a-zA-Z0-9]+$")
-		message(FATAL_ERROR "Invalid DocumentRef \"${_arg_add_extern_SPDXID}\"")
+		_sbom_log(FATAL_ERROR "Invalid DocumentRef \"${_arg_add_extern_SPDXID}\"")
 	endif()
 
 	set(SBOM_LAST_SPDXID "${_arg_add_extern_SPDXID}")
@@ -1215,7 +1223,7 @@ else()
 endif()
 
 if(NOT \"\${ext_content}\" MATCHES \"[\\r\\n]DocumentNamespace:\")
-	message(FATAL_ERROR \"Missing DocumentNamespace in ${PATH}\")
+	_sbom_log(FATAL_ERROR \"Missing DocumentNamespace in ${PATH}\")
 endif()
 
 string(REGEX REPLACE
