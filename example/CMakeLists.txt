@@ -28,7 +28,7 @@ include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
 
 # Include the SBOM.cmake file to generate the SBOM.
-include(../cmake/sbom.cmake)
+include(sbom)
 
 # Now we can start building the sbom.
 # This is the only required call to generate the SBOM. It has to be called before any other

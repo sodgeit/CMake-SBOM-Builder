@@ -357,7 +357,7 @@ Creator: Tool: CMake-SBOM-Builder-${SBOM_BUILDER_VERSION}
 CreatorComment: <text>This SPDX document was created from CMake ${CMAKE_VERSION}, using CMake-SBOM-Builder from https://github.com/sodgeit/CMake-SBOM-Builder</text>
 Created: \${SBOM_CREATE_DATE}
 \${SBOM_EXT_DOCS}
-PackageName: ${CMAKE_CXX_COMPILER_ID}
+PackageName: Compiler-ID-${CMAKE_CXX_COMPILER_ID}
 SPDXID: SPDXRef-compiler
 PackageVersion: ${CMAKE_CXX_COMPILER_VERSION}
 PackageDownloadLocation: NOASSERTION

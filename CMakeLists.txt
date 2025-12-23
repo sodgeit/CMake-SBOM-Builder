@@ -7,9 +7,9 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-project(cmake-sbom)
+project(CMake-SBOM-Builder)
 
-include(cmake/sbom.cmake)
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" )
 
 add_subdirectory(example)
 add_subdirectory(test)
