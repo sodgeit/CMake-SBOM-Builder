@@ -656,7 +656,7 @@ function(sbom_generate)
 	string(REGEX REPLACE "-([0-9]+)$" "\\1" _arg_sbom_gen_PACKAGE_NAME "${_arg_sbom_gen_PACKAGE_NAME}")
 
 	set(SBOM_FILENAME "${_arg_sbom_gen_OUTPUT}" PARENT_SCOPE)
-	set(SBOM_BINARY_DIR "${PROJECT_BINARY_DIR}/sbom")
+	set(SBOM_BINARY_DIR "${PROJECT_BINARY_DIR}/__sbom")
 	set(SBOM_SNIPPET_DIR "${SBOM_BINARY_DIR}/sbom-src/$<CONFIG>")
 	set_property(GLOBAL PROPERTY SBOM_FILENAME "${_arg_sbom_gen_OUTPUT}")
 	set_property(GLOBAL PROPERTY SBOM_BINARY_DIR "${SBOM_BINARY_DIR}")
