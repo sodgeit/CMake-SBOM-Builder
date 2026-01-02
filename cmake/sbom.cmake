@@ -10,6 +10,7 @@ include(GNUInstallDirs)
 find_package(Git)
 
 set(SBOM_BUILDER_VERSION "0.0.0-development-version" CACHE STRING "CMake-SBOM-Builder version")
+set(SBOM_BUILDER_UUID_NAMESPACE "7655e89c-9e89-46ae-8966-1aed9d3b54cf" CACHE INTERNAL "CMake-SBOM-Builder UUID namespace")
 
 if(SBOM_BUILDER_VERSION MATCHES "development-version")
 	message( WARNING "Your project is using an unstable development version of CMake-SBOM-Builder. \
@@ -237,6 +238,11 @@ macro(_sbom_log log_level log_message)
 	message(${log_level} "SBOM-Builder: ${log_message}")
 endmacro()
 
+function(sbom_gen_spdxid_uuid out_uuid name )
+	string(UUID out_var NAMESPACE "${SBOM_BUILDER_UUID_NAMESPACE}" NAME ${name} TYPE SHA1)
+	set(${out_uuid} "urn:uuid:${out_var}" PARENT_SCOPE)
+endfunction()
+
 # Sets the given variable to a unique SPDIXID-compatible value.
 function(sbom_spdxid)
 	set(oneValueArgs VARIABLE CHECK)
@@ -283,6 +289,198 @@ function(sbom_spdxid)
 
 	set(${SBOM_SPDXID_VARIABLE} "${_id}" PARENT_SCOPE)
 endfunction()
+
+function(_sbom_spdx3_append_to_graph sbom json_value out_sbom)
+	set(_graph_len 0)
+	string(JSON _graph_len LENGTH "${sbom}" "@graph")
+
+	string(JSON sbom SET "${sbom}" "@graph" ${_graph_len} "${json_value}")
+	set("${out_sbom}" "${sbom}" PARENT_SCOPE)
+endfunction()
+
+function(_sbom_spdx3_create_json_obj _out_sbom)
+	set(spdx3_toplevel_structure "
+{
+	\"$schema\":\"/home/avus/Projects/CMake-SBOM-Builder/schema.json\",
+	\"@context\":\"https://spdx.org/rdf/3.0.1/spdx-context.jsonld\",
+	\"@graph\":[]
+}"
+	)
+
+	set(${_out_sbom} "${spdx3_toplevel_structure}" PARENT_SCOPE)
+endfunction()
+
+function(_sbom_spdx3_add_creation_info sbom out_sbom)
+	set(value "
+{
+	\"type\":\"CreationInfo\",
+	\"created\":\"\${SBOM_CREATE_DATE}\",
+	\"@id\":\"_:creationInfo\",
+	\"specVersion\":\"3.0.1\",
+	\"createdBy\":[],
+	\"createdUsing\":[],
+	\"comment\":\"This SPDX document was created with CMake ${CMAKE_VERSION}, using CMake-SBOM-Builder from https://github.com/sodgeit/CMake-SBOM-Builder\"
+}"
+	)
+
+	_sbom_spdx3_append_to_graph("${sbom}" "${value}" sbom)
+	set("${out_sbom}" "${sbom}" PARENT_SCOPE)
+endfunction()
+
+function(_sbom_spdx3_add_creator_tool sbom out_sbom)
+	set(spdxid_uuid "")
+	sbom_gen_spdxid_uuid(spdxid_uuid "CMake-SBOM-Builder-${SBOM_BUILDER_VERSION}")
+
+	set(value "
+{
+	\"type\":\"Tool\",
+	\"name\":\"CMake-SBOM-Builder-${SBOM_BUILDER_VERSION}\",
+	\"spdxId\":\"${spdxid_uuid}\",
+	\"creationInfo\":\"_:creationInfo\"
+}")
+
+	_sbom_spdx3_append_to_graph("${sbom}" "${value}" sbom)
+
+	set(_created_by_len 0)
+	string(JSON _created_by_len LENGTH "${sbom}" "@graph" "0" "createdBy")
+	set(_element_len 0)
+	string(JSON _element_len LENGTH "${sbom}" "@graph" "1" "element")
+
+	string(JSON sbom SET "${sbom}" "@graph" 0 "createdUsing" ${_created_by_len} "\"${spdxid_uuid}\"")
+	string(JSON sbom SET "${sbom}" "@graph" 1 "element" ${_element_len} "\"${spdxid_uuid}\"")
+	set("${out_sbom}" "${sbom}" PARENT_SCOPE)
+endfunction()
+
+function(_sbom_spdx3_add_creator sbom type name out_sbom)
+	set(spdxid_uuid "")
+	sbom_gen_spdxid_uuid(spdxid_uuid "Creator-${type}")
+
+	set(value "
+{
+	\"type\":\"${type}\",
+	\"name\":\"${name}\",
+	\"spdxId\":\"${spdxid_uuid}\",
+	\"creationInfo\":\"_:creationInfo\"
+}")
+
+	_sbom_spdx3_append_to_graph("${sbom}" "${value}" sbom)
+
+	set(_created_by_len 0)
+	string(JSON _created_by_len LENGTH "${sbom}" "@graph" "0" "createdBy")
+	set(_element_len 0)
+	string(JSON _element_len LENGTH "${sbom}" "@graph" "1" "element")
+	set(_originated_by_len 0)
+	string(JSON _element_len LENGTH "${sbom}" "@graph" "3" "originatedBy")
+
+	string(JSON sbom SET "${sbom}" "@graph" 0 "createdBy" ${_created_by_len} "\"${spdxid_uuid}\"")
+	string(JSON sbom SET "${sbom}" "@graph" 1 "element" ${_element_len} "\"${spdxid_uuid}\"")
+	string(JSON sbom SET "${sbom}" "@graph" 3 "originatedBy" ${_originated_by_len} "\"${spdxid_uuid}\"")
+	set("${out_sbom}" "${sbom}" PARENT_SCOPE)
+endfunction()
+
+function(_sbom_spdx3_add_doc sbom out_sbom)
+	sbom_gen_spdxid_uuid(spdxid_uuid "Document")
+	set(value "
+{
+	\"type\": \"SpdxDocument\",
+	\"spdxId\": \"${spdxid_uuid}\",
+	\"creationInfo\": \"_:creationinfo\",
+	\"rootElement\": [],
+	\"element\": [
+		\"http://spdx.example.com/Package1/myprogram\",
+		\"http://spdx.example.com/Relationship/1\"
+	],
+	\"profileConformance\": [
+		\"lite\"
+	]
+}")
+	_sbom_spdx3_append_to_graph("${sbom}" "${value}" sbom)
+	set("${out_sbom}" "${sbom}" PARENT_SCOPE)
+endfunction()
+
+function(_sbom_spdx3_add_software_Sbom sbom out_sbom)
+	sbom_gen_spdxid_uuid(spdxid_uuid "software_Sbom")
+	set(value "
+{
+	\"type\": \"software_Sbom\",
+	\"spdxId\": \"${spdxid_uuid}\",
+	\"creationInfo\": \"_:creationinfo\",
+	\"rootElement\": [
+		\"http://spdx.example.com/Package1\"
+	],
+	\"element\": [
+		\"http://spdx.example.com/Package1/myprogram\",
+		\"http://spdx.example.com/Package1\"
+	],
+	\"software_sbomType\": [
+		\"build\"
+	]
+}")
+	set(_element_len 0)
+	string(JSON _element_len LENGTH "${sbom}" "@graph" "1" "element")
+	string(JSON sbom SET "${sbom}" "@graph" 1 "element" ${_element_len} "\"${spdxid_uuid}\"")
+	string(JSON sbom SET "${sbom}" "@graph" 1 "rootElement" ${_element_len} "\"${spdxid_uuid}\"")
+
+	_sbom_spdx3_append_to_graph("${sbom}" "${value}" sbom)
+	set("${out_sbom}" "${sbom}" PARENT_SCOPE)
+endfunction()
+
+function(_sbom_spdx3_add_software_Package
+	sbom
+	package_name
+	version
+	downloade_location
+	out_sbom
+)
+	sbom_gen_spdxid_uuid(spdxid_uuid "software_Package")
+	set(value "
+{
+	\"type\": \"software_Package\",
+	\"spdxId\": \"http://spdx.example.com/Package1\",
+	\"creationInfo\": \"_:creationinfo\",
+	\"name\": \"${package_name}\",
+	\"software_packageVersion\": \"${version}\",
+	\"software_downloadLocation\": \"${downloade_location}\",
+	\"builtTime\": \"\${SBOM_CREATE_DATE}\",
+	\"originatedBy\": []
+}")
+	set(_element_len 0)
+	string(JSON _element_len LENGTH "${sbom}" "@graph" "1" "element")
+	string(JSON sbom SET "${sbom}" "@graph" 1 "element" ${_element_len} "\"${spdxid_uuid}\"")
+
+	_sbom_spdx3_append_to_graph("${sbom}" "${value}" sbom)
+	set("${out_sbom}" "${sbom}" PARENT_SCOPE)
+endfunction()
+
+macro(_sbom_generate_spdx3_template)
+	set(sbom_json_obj "")
+	_sbom_spdx3_create_json_obj(sbom_json_obj)
+	message(${sbom_json_obj})
+	# always add creation info first, other parts expect it to be at index 0
+	_sbom_spdx3_add_creation_info("${sbom_json_obj}" sbom_json_obj)
+	# similar thing whith the document object at index 1
+	_sbom_spdx3_add_doc("${sbom_json_obj}" sbom_json_obj)
+	# similar thing whith the document object at index 2
+	_sbom_spdx3_add_software_Sbom("${sbom_json_obj}" sbom_json_obj)
+	# similar thing whith the document object at index 3
+	_sbom_spdx3_add_software_Package(
+		"${sbom_json_obj}"
+		"${_arg_sbom_gen_PACKAGE_NAME}"
+		"${_arg_sbom_gen_PACKAGE_VERSION}"
+		"${_arg_sbom_gen_PACKAGE_DOWNLOAD}"
+		sbom_json_obj
+	)
+
+	_sbom_spdx3_add_creator_tool("${sbom_json_obj}" sbom_json_obj)
+	if(DEFINED _arg_sbom_gen_CREATOR_PERSON)
+		_sbom_spdx3_add_creator("${sbom_json_obj}" Person "${_arg_sbom_gen_CREATOR_PERSON}" sbom_json_obj)
+	elseif(DEFINED _arg_sbom_gen_CREATOR_ORGANIZATION)
+		_sbom_spdx3_add_creator("${sbom_json_obj}" Organization "${_arg_sbom_gen_CREATOR_ORGANIZATION}" sbom_json_obj)
+	endif()
+
+	_sbom_log(WARNING "${sbom_json_obj}")
+	file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/bla.json" "${sbom_json_obj}")
+endmacro()
 
 #TODO BuiltDate should be evaluated during build, not when sbom is generated.
 
@@ -354,7 +552,7 @@ DocumentName: ${doc_name}
 DocumentNamespace: ${_arg_sbom_gen_NAMESPACE}\
 $<$<BOOL:${_pkg_creator_field}>:\n${_pkg_creator_field}>
 Creator: Tool: CMake-SBOM-Builder-${SBOM_BUILDER_VERSION}
-CreatorComment: <text>This SPDX document was created from CMake ${CMAKE_VERSION}, using CMake-SBOM-Builder from https://github.com/sodgeit/CMake-SBOM-Builder</text>
+CreatorComment: <text>This SPDX document was created with CMake ${CMAKE_VERSION}, using CMake-SBOM-Builder from https://github.com/sodgeit/CMake-SBOM-Builder</text>
 Created: \${SBOM_CREATE_DATE}
 \${SBOM_EXT_DOCS}
 PackageName: Compiler-ID-${CMAKE_CXX_COMPILER_ID}
@@ -526,6 +724,19 @@ endfunction()
 # Starts SBOM generation. Call sbom_add() and friends afterwards. End with sbom_finalize(). Input
 # files allow having variables and generator expressions.
 function(sbom_generate)
+	cmake_parse_arguments(_arg_sbom_gen "" "SPDX_VERSION" "" ${ARGN})
+
+	if(NOT DEFINED _arg_sbom_gen_SPDX_VERSION)
+		set(_arg_sbom_gen_SPDX_VERSION "2.3")
+	else()
+		set(_arg_sbom_gen_SPDX_VERSION "3")
+	endif()
+
+	_sbom_log(STATUS "Using SPDX-Version ${_arg_sbom_gen_SPDX_VERSION}")
+	_sbom_generate( "${_arg_sbom_gen_SPDX_VERSION}" ${_arg_sbom_gen_UNPARSED_ARGUMENTS})
+endfunction()
+
+function(_sbom_generate spdxversion)
 	set(oneValueArgs
 		OUTPUT
 		NAMESPACE
@@ -686,6 +897,10 @@ function(sbom_generate)
 
 	set(_sbom_intermediate_file "$<CONFIG>/sbom.spdx.in")
 	set(_sbom_document_template "SPDXRef-DOCUMENT.spdx.in")
+
+	if("${spdxversion}" STREQUAL "3")
+		_sbom_generate_spdx3_template()
+	endif()
 
 	_sbom_generate_document_template()
 	set(SBOM_LAST_SPDXID "SPDXRef-${_arg_sbom_gen_PACKAGE_NAME}" PARENT_SCOPE)

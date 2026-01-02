@@ -40,6 +40,7 @@ sbom_generate(
 	PACKAGE_LICENSE "MIT"
 	PACKAGE_NOTES SUMMARY "Just a simple example project, to demonstrate the SBOM-Builder"
 	PACKAGE_PURPOSE "APPLICATION"
+	SPDX_VERSION 3
 )
 
 # mention the dependencies used in the SBOM
