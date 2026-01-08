@@ -4,14 +4,19 @@ Generating SPDX Software Bill of Materials (SBOMs) for arbitrary CMake projects.
 
 The CMake-SBOM-Builder aims to be compliant with:
 
-- [Technical Guideline TR-03183](https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Publications/TechGuidelines/TR03183/BSI-TR-03183-2.pdf?__blob=publicationFile&v=5) of the German Federal Office for Information Security (BSI)
-- The US [Executive Order 14028](https://www.nist.gov/itl/executive-order-14028-improving-nations-cybersecurity/software-security-supply-chains-software-1)
-- [SPDX Specification 2.3](https://spdx.github.io/spdx-spec/v2.3/)
+- [Technical Guideline TR-03183](https://www.bsi.bund.de/dok/TR-03183-en) of the German Federal Office for Information Security (BSI)
+- [SPDX Specification 3.0](https://spdx.github.io/spdx-spec/v3.0/)
 
 The SBOM-Builder is designed to seamlessly be integrated into your CMake project.  It generates a single SBOM for your project, based on the files you install and the package dependencies you specify.
 It also comes with a version extraction feature, to generate version information from your Git repository and make it available in your CMake files, your C/C++ code via a cmake target, and in your shell environment via a script.
 
 To get started, take a look at the [example](#example) and how to [add the SBOM-Builder to your project](#adding-sbom-builder-to-your-project).
+
+## Important note on spdx 3.0 compliance
+
+Efforts are currently underway to ensure compliance with SPDX 3.0. SPDX 2.3 will be removed at the same time.
+We'll try to keep the transition as smooth as possible, but some breaking changes to the API and the generated SBOMs may not be avoidable.
+The remaining documentation will be updated accordingly once the transition is complete.
 
 ---
 
@@ -25,7 +30,7 @@ Major Changes include:
 - **Single-File Integration**: We condensed everything into a single file to facilitate integration with CMake's `file` command, making it simpler and more efficient to use.
 - **Multi Config Generator Enhancements**: The SBOM generation better integrates with multi-config generators like Visual Studio and Ninja Multi-Config. Different SBOM's are generated for each configuration.
 - **Modernized CMake**: A higher minimum required version (>=3.16), ensuring better compatibility and taking advantage of newer functionalities.
-- **Wider support for SPDX 2.3**: More SPDX fields are supported for better compliance with the SPDX 2.3 specification.
+- **Support for SPDX 3.0**
 - **Compliance with BSI-Guidelines**
 - **Improved Documentation**
 
@@ -48,7 +53,6 @@ Major Changes include:
 - [Version Extraction](#version-extraction)
 	- [`version_extract()`](#version_extract)
 	- [`version_generate()`](#version_generate)
-- [Compatibility Strategy](#compatibility-strategy)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
 
@@ -350,18 +354,6 @@ This function generates the following files, containing the above-mentioned vari
   - Link the target `${PROJECT_NAME}-version` and include `${PROJECT_NAME}-version.h` to access the version information in C/C++. [(example)](example/CMakeLists.txt).
 
 All files are generated in `${PROJECT_BINARY_DIR}/version/[scripts|include|doc]`. The CMake variables `VERSION_SCRIPT_DIR`, `VERSION_INC_DIR`, and `VERSION_DOC_DIR` point to these directories.
-
----
-
-## Compatibility Strategy
-
-CMake frequently releases new features and improvements, and sometimes deprecates or supersedes old features. To ensure our script remains functional and takes advantage of these updates, we will update our minimum required CMake version in line with the oldest supported Ubuntu LTS release.
-
-As of the time of writing, the oldest supported Ubuntu LTS release is Ubuntu 20.04, which includes CMake version 3.16. When support for Ubuntu 20.04 is dropped in May 2025, we will update our minimum required to align with the next oldest supported Ubuntu LTS release. (Ubuntu 22.04, which includes CMake version 3.22)
-
-Our testing strategy will also be aligned with this approach.
-
-We believe this approach strikes a balance between ensuring broad compatibility for users on stable and long-term platforms and leveraging updated features and improvements in CMake.
 
 ---
 
