@@ -63,7 +63,7 @@ function(version_extract)
 		endif()
 
 		execute_process(
-			COMMAND ${GIT_EXECUTABLE} describe --tags
+			COMMAND ${GIT_EXECUTABLE} describe --tags --always
 			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 			OUTPUT_VARIABLE _git_describe
 			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
