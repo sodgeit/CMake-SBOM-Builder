@@ -238,6 +238,12 @@ macro(_sbom_log log_level log_message)
 	message(${log_level} "SBOM-Builder: ${log_message}")
 endmacro()
 
+# Adds another level of escaping to the string in the given variable.
+# For variables that will be used in generated CMake code. E.g. our generated install scripts
+macro(_sbom_inplace_quote_escape var)
+	string(REGEX REPLACE "\\\"" "\\\\\"" "${var}" "${${var}}")
+endmacro()
+
 function(sbom_gen_spdxid_uuid out_uuid name )
 	string(UUID out_var NAMESPACE "${SBOM_BUILDER_UUID_NAMESPACE}" NAME ${name} TYPE SHA1)
 	set(${out_uuid} "urn:uuid:${out_var}" PARENT_SCOPE)
