@@ -1337,6 +1337,10 @@ function(sbom_add_package NAME)
 		)
 	endif()
 
+	if(NOT DEFINED _arg_add_pkg_COPYRIGHT)
+		set(_arg_add_pkg_COPYRIGHT "NOASSERTION")
+	endif()
+
 	# TODO: add CHECKSUM to serialization; didn't find how to add in SPDX3 spec
 	# TODO: add EXTERNAL_REFERENCES to serialization: These function completely different from SPDX2.x
 	# TODO: add PURPOSE to serialization: Uses different format and slightly different keywords in SPDX3
