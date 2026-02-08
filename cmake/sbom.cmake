@@ -697,7 +697,8 @@ macro(_sbom_generate_spdx3_template)
 		${_sbom_gen_pkg_license},
 		${_sbom_gen_pkg_license_declared},
 		${_sbom_gen_pkg_license_concluded},
-		\${SBOM_PACKAGE_LIST}
+\${SBOM_PACKAGE_LIST},
+\${SBOM_PACKAGE_CONTENT_LIST}
 	]
 }"
 	)
@@ -1017,12 +1018,16 @@ file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"\${_f_contents}\")
 
 set(SBOM_VERIFICATION_CODES \"\")
 
-\# contains the list of all package dependencies added via sbom_add_package
-set(SBOM_PACKAGE_LIST \"\")
-
 \# contains the list of all document elements added
 set(SBOM_DOCUMENT_ELEMENT_LIST \"${_sbom_doc_elem_list}\")
 set(SBOM_SOFTWARE_PKG_ELEMENT_LIST \"${_sbom_software_pkg_elem_list}\")
+
+\# contains the list of all package dependencies added via sbom_add_package
+set(SBOM_PACKAGE_LIST \"\")
+
+\# contains the list of all files that make up the package this cmakeproject produces
+\# populated via sbom_add_file, sbom_add_directory, and sbom_add_target
+set(SBOM_PACKAGE_CONTENT_LIST \"\")
 "
 	)
 endfunction()
@@ -1058,7 +1063,7 @@ endif()
 file(WRITE \"\${SBOM_BINARY_DIR}/sbom-build/$<CONFIG>/verification.txt\" \"\${SBOM_VERIFICATION_CODES}\")
 file(SHA1 \"\${SBOM_BINARY_DIR}/sbom-build/$<CONFIG>/verification.txt\" SBOM_VERIFICATION_CODE)
 
-\#Transform cmake list into valid Json array
+\#Transform cmakelists into valid Json array
 \# 1. Surround each element with double quotes.
 list(TRANSFORM SBOM_DOCUMENT_ELEMENT_LIST APPEND \"\\\"\")
 list(TRANSFORM SBOM_DOCUMENT_ELEMENT_LIST PREPEND \"\\\"\")
@@ -1070,6 +1075,7 @@ _sbom_cmakelist_to_printable_list(\"SBOM_DOCUMENT_ELEMENT_LIST\")
 _sbom_cmakelist_to_printable_list(\"SBOM_SOFTWARE_PKG_ELEMENT_LIST\")
 
 _sbom_cmakelist_to_printable_list(\"SBOM_PACKAGE_LIST\")
+_sbom_cmakelist_to_printable_list(\"SBOM_PACKAGE_CONTENT_LIST\")
 
 configure_file(\"\${SBOM_INTERMEDIATE_FILE}\" \"\${SBOM_EXPORT_FILENAME}\")
 "
@@ -1118,24 +1124,11 @@ function(_sbom_add_pkg_content PATH)
 	set(SBOM_LAST_SPDXID "${_arg_add_pkg_content_SPDXID}")
 	set(SBOM_LAST_SPDXID "${_arg_add_pkg_content_SPDXID}" PARENT_SCOPE)
 
-	set(_fields "")
+	set(_properties "")
 
-	set(_arg_add_pkg_content_LICENSE_DECLARED "NOASSERTION")
-	if(NOT DEFINED _arg_add_pkg_content_LICENSE)
-		get_property(_sbom_package_license GLOBAL PROPERTY sbom_package_license)
-		set(_arg_add_pkg_content_LICENSE "${_sbom_package_license}")
-	endif()
-	_sbom_parse_license("CONCLUDED;${_arg_add_pkg_content_LICENSE}" _arg_add_pkg_content_LICENSE_CONCLUDED _arg_add_pkg_content_LICENSE_DECLARED _arg_add_pkg_content_LICENSE_COMMENT)
-	string(APPEND _fields "\nLicenseConcluded: ${_arg_add_pkg_content_LICENSE_CONCLUDED}")
-	if(DEFINED _arg_add_pkg_content_LICENSE_COMMENT)
-		string(APPEND _fields "\nLicenseComments: <text>${_arg_add_pkg_content_LICENSE_COMMENT}</text>")
-	endif()
-
-	if(DEFINED _arg_add_pkg_content_FILETYPE)
-		_sbom_parse_filetype("${_arg_add_pkg_content_FILETYPE}" _arg_add_pkg_content_FILETYPE)
-		foreach(_filetype ${_arg_add_pkg_content_FILETYPE})
-			string(APPEND _fields "\nFileType: ${_filetype}")
-		endforeach()
+	set(filekind "file")
+	if(_arg_add_pkg_content_DIR)
+		set(filekind "directory")
 	endif()
 
 	set(_hash_algo "SHA1;SHA256") # SHA1 is always required by SPDX, SHA256 required by TR-03183
@@ -1154,32 +1147,19 @@ function(_sbom_add_pkg_content PATH)
 		get_property(_sbom_package_copyright GLOBAL PROPERTY sbom_package_copyright)
 		set(_arg_add_pkg_content_COPYRIGHT "${_sbom_package_copyright}")
 	endif()
-	string(APPEND _fields "\nFileCopyrightText: ${_arg_add_pkg_content_COPYRIGHT}")
+
+	list(APPEND _properties
+		"\"creationInfo\": \"_:creationInfo\""
+		"\"type\": \"software_File\""
+		"\"software_fileKind\": \"${filekind}\""
+		"\"software_copyrightText\": \"${_arg_add_pkg_content_COPYRIGHT}\""
+	)
 
 	if(DEFINED _arg_add_pkg_content_COMMENT)
-		string(APPEND _fields "\nComment: ${_arg_add_pkg_content_COMMENT}")
+		list(APPEND _properties "\"comment\": \"${_arg_add_pkg_content_COMMENT}\"")
 	endif()
 
-	if(DEFINED _arg_add_pkg_content_NOTICE)
-		string(APPEND _fields "\nFileNotice: ${_arg_add_pkg_content_NOTICE}")
-	endif()
-
-	if(DEFINED _arg_add_pkg_content_CONTRIBUTORS)
-		foreach(_contributor ${_arg_add_pkg_content_CONTRIBUTORS})
-			string(APPEND _fields "\nFileContributor: ${_contributor}")
-		endforeach()
-	endif()
-
-	if(DEFINED _arg_add_pkg_content_ATTRIBUTION)
-		foreach(_attribution ${_arg_add_pkg_content_ATTRIBUTION})
-			string(APPEND _fields "\nFileAttributionText: ${_attribution}")
-		endforeach()
-	endif()
-
-	if(NOT DEFINED _arg_add_pkg_content_RELATIONSHIP)
-		set(_arg_add_pkg_content_RELATIONSHIP
-			"SPDXRef-${_sbom_project} CONTAINS @SBOM_LAST_SPDXID@")
-	endif()
+	_sbom_inplace_quote_escape( "_properties")
 
 	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 
@@ -1191,6 +1171,8 @@ function(_sbom_add_pkg_content PATH)
 		"
 cmake_policy(SET CMP0011 NEW)
 cmake_policy(SET CMP0012 NEW)
+
+set(properties \"${_properties}\")
 
 set(ADDING_DIR ${_arg_add_pkg_content_DIR})
 
@@ -1214,11 +1196,18 @@ endif()
 
 set(_count 0)
 foreach(_f IN LISTS _files)
+	set(file_entry \"\${properties}\")
+
 	set(_id \"${SBOM_LAST_SPDXID}\")
 	if(ADDING_DIR)
 		set(_id \"${SBOM_LAST_SPDXID}-\${_count}\")
 		math(EXPR _count \"\${_count} + 1\")
 	endif()
+
+	list(PREPEND file_entry
+		\"\\\"name\\\": \\\"\${_f}\\\"\"
+		\"\\\"spdxId\\\": \\\"\${_id}\\\"\"
+)
 
 	set(_relations \"\")
 	foreach(_rel IN LISTS relationships)
@@ -1226,25 +1215,42 @@ foreach(_f IN LISTS _files)
 		string(APPEND _relations \"\\nRelationship: \${_tmp}\")
 	endforeach()
 
-	set(_checksum_fields \"\")
+	set(verifiedusing \"\")
 	foreach(_algo ${_hash_algo})
+		set(hash_properties \"\")
 		file(\${_algo} \${CMAKE_INSTALL_PREFIX}/\${_f} _hash)
 		if(\"\${_algo}\" STREQUAL \"SHA1\")
 			list(APPEND SBOM_VERIFICATION_CODES \${_hash})
 		endif()
-		string(APPEND _checksum_fields \"\\nFileChecksum: \${_algo}: \${_hash}\")
+		string(TOLOWER \"\${_algo}\" _algo)
+		list(APPEND hash_properties
+			\"\\t\\t\\\"type\\\": \\\"Hash\\\"\"
+			\"\\t\\t\\\"algorithm\\\": \\\"\${_algo}\\\"\"
+			\"\\t\\t\\\"hashValue\\\": \\\"\${_hash}\\\"\"
+		)
+		_sbom_cmakelist_to_printable_list(\"hash_properties\")
+		set(hash_properties \"\\t{\\n\${hash_properties}\\n\\t}\")
+		list(APPEND verifiedusing \${hash_properties})
 	endforeach()
-	file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
-\"
-FileName: ./\${_f}
-SPDXID: \${_id}\
-${_fields}\
-\${_checksum_fields}\
-\${_relations}
-\"
-)
+
+	_sbom_cmakelist_to_printable_list(\"verifiedusing\")
+	set(verifiedusing \"\\\"verifiedUsing\\\": [\\n\${verifiedusing}\\n]\")
+	list(APPEND file_entry \${verifiedusing})
+
+	list(APPEND SBOM_DOCUMENT_ELEMENT_LIST \"\${_id}\")
+	list(APPEND SBOM_SOFTWARE_PKG_ELEMENT_LIST \"\${_id}\")
+
+	_sbom_cmakelist_to_printable_list(\"file_entry\")
+
+	set( file_entry
+\"{
+\${file_entry}
+}\"
+	)
+
+	list(APPEND SBOM_PACKAGE_CONTENT_LIST \"\${file_entry}\")
 endforeach()
-	"
+"
 	)
 
 	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
