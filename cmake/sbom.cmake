@@ -502,53 +502,45 @@ function(_sbom_serialize_package
 
 	cmake_parse_arguments( _arg_ser_pkg "" "DOWNLOAD;URL;SOURCE_INFO" "NOTES;ATTRIBUTION" "${ARGN}")
 
-	set(_download_property FALSE)
-	set(_download_property_txt "")
+	set(properties "")
+	list( APPEND properties
+		"\"creationInfo\":\"_:creationInfo\""
+		"\"type\": \"software_Package\""
+		"\"spdxId\": \"${spdxid}\""
+		"\"name\": \"${name}\""
+		"\"software_packageVersion\": \"${version}\""
+		"\"software_copyrightText\": \"${copyright}\""
+	)
+
 	if(DEFINED _arg_ser_pkg_DOWNLOAD)
-		set(_download_property TRUE)
-		set(_download_property_txt "\"software_downloadLocation\":\"${_arg_ser_pkg_DOWNLOAD}\",")
+		list(APPEND properties "\"software_downloadLocation\": \"${_arg_ser_pkg_DOWNLOAD}\"")
 	endif()
 
-	set(_url_property FALSE)
-	set(_url_property_txt "")
 	if(DEFINED _arg_ser_pkg_URL)
-		set(_url_property TRUE)
-		set(_url_property_txt "\"homepage\":\"${_arg_ser_pkg_URL}\",")
+		list(APPEND properties "\"homepage\": \"${_arg_ser_pkg_URL}\"")
 	endif()
 
-	set(_source_info_property FALSE)
-	set(_source_info_property_txt "")
 	if(DEFINED _arg_ser_pkg_SOURCE_INFO)
-		set(_source_info_property TRUE)
-		set(_source_info_property_txt "\"sourceInfo\":\"${_arg_ser_pkg_SOURCE_INFO}\",")
+		list(APPEND properties "\"sourceInfo\": \"${_arg_ser_pkg_SOURCE_INFO}\"")
 	endif()
 
-	set(__attribution_property FALSE)
 	set(__attribution_property_txt "")
 	if(DEFINED _arg_ser_pkg_ATTRIBUTION)
 		foreach(_attr IN LISTS _arg_ser_pkg_ATTRIBUTION)
-			set(__attribution_property TRUE)
 			string(APPEND __attribution_property_txt "\"${_attr}\",")
 		endforeach()
-		set(_attribution_property_txt "\"attributionText\":[${__attribution_property_txt}]")
+		list(APPEND properties "\"attributionText\": [${__attribution_property_txt}]")
 	endif()
 
 	_sbom_serialize_package_notes("${_arg_ser_pkg_NOTES}" _sbom_gen_pkg_notes_genex)
 	_sbom_serialize_package_dates("${_arg_ser_pkg_DATE}" _sbom_gen_pkg_dates_genex)
 
-	set( pkg "{
-		\\\"type\\\": \\\"software_Package\\\",
-		\\\"spdxId\\\": \\\"${spdxid}\\\",
-		\\\"name\\\": \\\"${name}\\\",
-		\\\"software_packageVersion\\\": \\\"${version}\\\",
-		\\\"software_copyrightText\\\": \\\"${copyright}\\\",
-		$<$<BOOL:${_download_property}>:${_download_property_txt}>
-		$<$<BOOL:${_url_property}>:${_url_property_txt}>
-		$<$<BOOL:${_source_info_property}>:${_source_info_property_txt}>
-		$<$<BOOL:${__attribution_property}>:${_attribution_property_txt}>
-		${_sbom_gen_pkg_notes_genex}
-		${_sbom_gen_pkg_dates_genex}
-	}"
+	_sbom_cmakelist_to_printable_list(properties)
+
+	set( pkg
+"{
+${properties}
+}"
 	)
 
 	set(${out_var} "${pkg}" PARENT_SCOPE)
@@ -704,7 +696,8 @@ macro(_sbom_generate_spdx3_template)
 		},
 		${_sbom_gen_pkg_license},
 		${_sbom_gen_pkg_license_declared},
-		${_sbom_gen_pkg_license_concluded}
+		${_sbom_gen_pkg_license_concluded},
+		\${SBOM_PACKAGE_LIST}
 	]
 }"
 	)
@@ -941,7 +934,7 @@ function(sbom_generate)
 		else()
 			set(_pkg_version "${GIT_VERSION_PATH}")
 		endif()
-		set(_arg_sbom_gen_OUTPUT "./${CMAKE_INSTALL_DATAROOTDIR}/${_safe_package_name}-sbom-${_pkg_version}.spdx")
+		set(_arg_sbom_gen_OUTPUT "./${CMAKE_INSTALL_DATAROOTDIR}/${_safe_package_name}-sbom-${_pkg_version}.json")
 	endif()
 	if(NOT IS_ABSOLUTE "${_arg_sbom_gen_OUTPUT}")
 		set(_arg_sbom_gen_OUTPUT "\${CMAKE_INSTALL_PREFIX}/${_arg_sbom_gen_OUTPUT}")
@@ -1004,6 +997,10 @@ macro(_sbom_log log_level log_message)
 	message(\${log_level} \"SBOM-Builder: \${log_message}\")
 endmacro()
 
+macro(_sbom_cmakelist_to_printable_list var)
+	list(JOIN \"\${var}\" \",\\n\" \"\${var}\")
+endmacro()
+
 set(SBOM_EXPORT_FILENAME \"${_arg_sbom_gen_OUTPUT}\")
 set(SBOM_BINARY_DIR \"${SBOM_BINARY_DIR}\")
 set(SBOM_SNIPPET_DIR \"${SBOM_SNIPPET_DIR}\")
@@ -1019,6 +1016,11 @@ file(READ \"\${SBOM_SNIPPET_DIR}/\${SBOM_DOCUMENT_TEMPLATE}\" _f_contents)
 file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\" \"\${_f_contents}\")
 
 set(SBOM_VERIFICATION_CODES \"\")
+
+\# contains the list of all package dependencies added via sbom_add_package
+set(SBOM_PACKAGE_LIST \"\")
+
+\# contains the list of all document elements added
 set(SBOM_DOCUMENT_ELEMENT_LIST \"${_sbom_doc_elem_list}\")
 set(SBOM_SOFTWARE_PKG_ELEMENT_LIST \"${_sbom_software_pkg_elem_list}\")
 "
@@ -1066,6 +1068,8 @@ list(TRANSFORM SBOM_SOFTWARE_PKG_ELEMENT_LIST PREPEND \"\\\"\")
 \# 2. Join list elements with comma and newline
 _sbom_cmakelist_to_printable_list(\"SBOM_DOCUMENT_ELEMENT_LIST\")
 _sbom_cmakelist_to_printable_list(\"SBOM_SOFTWARE_PKG_ELEMENT_LIST\")
+
+_sbom_cmakelist_to_printable_list(\"SBOM_PACKAGE_LIST\")
 
 configure_file(\"\${SBOM_INTERMEDIATE_FILE}\" \"\${SBOM_EXPORT_FILENAME}\")
 "
@@ -1397,12 +1401,14 @@ function(sbom_add_package NAME)
 		"${_arg_add_pkg_UNPARSED_ARGUMENTS}"
 	)
 
+	_sbom_inplace_quote_escape( "_sbom_add_pkg_package" )
+
 	_sbom_append_sbom_snippet("${_arg_add_pkg_SPDXID}.cmake")
 	file(
 		GENERATE
 		OUTPUT ${_sbom_snippet_dir}/${_arg_add_pkg_SPDXID}.cmake
 		CONTENT
-		"
+"
 \# This file is generated by sbom_add_package() for package ${NAME}.
 
 \# Add elements to the document and software package lists
@@ -1410,12 +1416,8 @@ function(sbom_add_package NAME)
 list(APPEND SBOM_DOCUMENT_ELEMENT_LIST \"${_arg_add_pkg_SPDXID}\")
 list(APPEND SBOM_SOFTWARE_PKG_ELEMENT_LIST \"${_arg_add_pkg_SPDXID}\")
 
-file(APPEND \"\${SBOM_INTERMEDIATE_FILE}\"
-\"
-${_sbom_add_pkg_package}
-\"
-			)
-			"
+list(APPEND SBOM_PACKAGE_LIST \"${_sbom_add_pkg_package}\")
+"
 	)
 endfunction()
 
