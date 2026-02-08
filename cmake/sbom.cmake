@@ -244,6 +244,15 @@ macro(_sbom_inplace_quote_escape var)
 	string(REGEX REPLACE "\\\"" "\\\\\"" "${var}" "${${var}}")
 endmacro()
 
+# Joins the elements of the given list variable with ",\n" and stores the result back in the same variable.
+# Useful for lists which will end up in readable format.
+# e.g.:
+#	- Json-arrays (without surrounding [] braces)
+#	- Lists of Json-Object properties (without surrounding {} braces)
+macro(_sbom_cmakelist_to_printable_list var)
+	list(JOIN "${var}" ",\\n" "${var}")
+endmacro()
+
 function(sbom_gen_spdxid_uuid out_uuid name )
 	string(UUID out_var NAMESPACE "${SBOM_BUILDER_UUID_NAMESPACE}" NAME ${name} TYPE SHA1)
 	set(${out_uuid} "urn:uuid:${out_var}" PARENT_SCOPE)
@@ -1036,6 +1045,7 @@ function(sbom_finalize)
 \# and is used to finalize the SBOM generation during installation.
 
 _sbom_log(STATUS \"Finalizing \${SBOM_EXPORT_FILENAME}\")
+
 list(SORT SBOM_VERIFICATION_CODES)
 string(REPLACE \";\" \"\" SBOM_VERIFICATION_CODES \"\${SBOM_VERIFICATION_CODES}\")
 string(TIMESTAMP SBOM_CREATE_DATE UTC)
@@ -1054,8 +1064,8 @@ list(TRANSFORM SBOM_SOFTWARE_PKG_ELEMENT_LIST APPEND \"\\\"\")
 list(TRANSFORM SBOM_SOFTWARE_PKG_ELEMENT_LIST PREPEND \"\\\"\")
 
 \# 2. Join list elements with comma and newline
-list(JOIN SBOM_DOCUMENT_ELEMENT_LIST \",\\n\" \"SBOM_DOCUMENT_ELEMENT_LIST\")
-list(JOIN SBOM_SOFTWARE_PKG_ELEMENT_LIST \",\\n\" \"SBOM_SOFTWARE_PKG_ELEMENT_LIST\")
+_sbom_cmakelist_to_printable_list(\"SBOM_DOCUMENT_ELEMENT_LIST\")
+_sbom_cmakelist_to_printable_list(\"SBOM_SOFTWARE_PKG_ELEMENT_LIST\")
 
 configure_file(\"\${SBOM_INTERMEDIATE_FILE}\" \"\${SBOM_EXPORT_FILENAME}\")
 "
