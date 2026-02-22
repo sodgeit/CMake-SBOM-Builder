@@ -252,10 +252,16 @@ macro(_sbom_cmakelist_to_printable_list var)
 	list(JOIN "${var}" ",\\n" "${var}")
 endmacro()
 
+macro(_sbom_propagate_spdxid_to_parentscope)
+	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
+	set(SBOM_LAST_SPDXID_PATH "${SBOM_LAST_SPDXID_PATH}" PARENT_SCOPE)
+endmacro()
+
 function(sbom_gen_spdxid VARIABLE SCOPE OUT_VAR)
 	set("${OUT_VAR}" "spdx://sbom/${SCOPE}/${VARIABLE}" PARENT_SCOPE)
-	set("SBOM_LAST_SPDXID" "${OUT_VAR}" PARENT_SCOPE)
-	set("SBOM_LAST_SPDXID_PATH" "${SCOPE}/${VARIABLE}" PARENT_SCOPE)
+	set(SBOM_LAST_SPDXID "spdx://sbom/${SCOPE}/${VARIABLE}")
+	set(SBOM_LAST_SPDXID_PATH "${SCOPE}/${VARIABLE}")
+	_sbom_propagate_spdxid_to_parentscope()
 endfunction()
 
 # Sets the given variable to a unique SPDIXID-compatible value.
@@ -461,18 +467,32 @@ set( out "
 	set(${out_var} "${out}" PARENT_SCOPE)
 endfunction()
 
-function(_sbom_serialize_license_entry creation_info license_id out_var out_id_var)
-	set(spdx_id "")
-	sbom_gen_spdxid("${license_id}" "License" "spdx_id")
+function(_sbom_serialize_license_entry)
+	set(one_value_args "LICENSE_ID" "OUT_VAR")
+	cmake_parse_arguments( _arg "" "${one_value_args}" "" ${ARGN})
 
+	foreach(val IN LISTS one_value_args)
+		if(NOT DEFINED _arg_${val})
+			_sbom_log(FATAL_ERROR "Missing argument ${val} for _sbom_serialize_license_entry")
+		endif()
+	endforeach()
+
+	sbom_gen_spdxid("${_arg_LICENSE_ID}" "License" "spdx_id")
+
+	set(properties "")
+	list(APPEND properties
+		"\"creationInfo\":\"_:creationInfo\""
+		"\"type\": \"simplelicensing_LicenseExpression\""
+		"\"spdxId\": \"${SBOM_LAST_SPDXID}\""
+		"\"simplelicensing_licenseExpression\": \"${_arg_LICENSE_ID}\""
+	)
+	_sbom_cmakelist_to_printable_list(properties)
 	set(license_entry "{
-		${creation_info},
-		\"type\": \"simplelicensing_LicenseExpression\",
-		\"spdxId\": \"${spdx_id}\",
-		\"simplelicensing_licenseExpression\": \"${license_id}\"
+${properties}
 	}")
-	set(${out_var} "${license_entry}" PARENT_SCOPE)
-	set(${out_id_var} "${spdx_id}" PARENT_SCOPE)
+
+	set("${_arg_OUT_VAR}" "${license_entry}" PARENT_SCOPE)
+	_sbom_propagate_spdxid_to_parentscope()
 endfunction()
 
 function(_sbom_serialize_relationship creation_info reltype from to out_var out_id_var)
@@ -586,35 +606,26 @@ macro(_sbom_generate_spdx3_template)
 		_sbom_gen_creation_info_id
 	)
 
-	# TODO licenses are weird. Every license needs to be defined as its own object.
-	# All pkg then refer to that license using relations.
-	# Will be interesting to see how to handle multiple pkg that use the same license.
-	# Need to look if the license is already defined and then reuse that object. or something like that
-	# spdx3 doesn't allow inline license definitions in the package object, for some reason... :(
-	_sbom_serialize_license_entry(
-		"${_creation_info_property}"
-		"${_arg_sbom_gen_PACKAGE_LICENSE}"
-		_sbom_gen_pkg_license
-		_sbom_gen_pkg_license_spdxid
-	)
+	_sbom_add_license(LICENSE_ID "${_arg_sbom_gen_PACKAGE_LICENSE}")
+	set(_sbom_gen_pkg_license_spdxid "${SBOM_LAST_SPDXID}")
 
-	_sbom_serialize_relationship(
-		"${_creation_info_property}"
-		"hasDeclaredLicense"
-		"${_spdx_software_pkg_id}"
-		"${_sbom_gen_pkg_license_spdxid}"
-		_sbom_gen_pkg_license_declared
-		_sbom_gen_pkg_license_declared_spdxid
-	)
-
-	_sbom_serialize_relationship(
-		"${_creation_info_property}"
-		"hasConcludedLicense"
-		"${_spdx_software_pkg_id}"
-		"${_sbom_gen_pkg_license_spdxid}"
-		_sbom_gen_pkg_license_concluded
-		_sbom_gen_pkg_license_concluded_spdxid
-	)
+#	_sbom_serialize_relationship(
+#		"${_creation_info_property}"
+#		"hasDeclaredLicense"
+#		"${_spdx_software_pkg_id}"
+#		"${_sbom_gen_pkg_license_spdxid}"
+#		_sbom_gen_pkg_license_declared
+#		_sbom_gen_pkg_license_declared_spdxid
+#	)
+#
+#	_sbom_serialize_relationship(
+#		"${_creation_info_property}"
+#		"hasConcludedLicense"
+#		"${_spdx_software_pkg_id}"
+#		"${_sbom_gen_pkg_license_spdxid}"
+#		_sbom_gen_pkg_license_concluded
+#		_sbom_gen_pkg_license_concluded_spdxid
+#	)
 
 	set(_sbom_doc_elem_list
 		"${_spdx_software_sbom_id}"
@@ -623,9 +634,6 @@ macro(_sbom_generate_spdx3_template)
 
 	set(_sbom_software_pkg_elem_list
 		"${_spdx_software_pkg_id}"
-		"${_sbom_gen_pkg_license_spdxid}"
-		"${_sbom_gen_pkg_license_declared_spdxid}"
-		"${_sbom_gen_pkg_license_concluded_spdxid}"
 	)
 
 	file(
@@ -692,11 +700,9 @@ macro(_sbom_generate_spdx3_template)
 			\"summary\": \"The compiler as identified by CMake, running on ${CMAKE_HOST_SYSTEM_NAME} (${CMAKE_HOST_SYSTEM_PROCESSOR})\",
 			\"comment\": \"${_spdx_software_pkg_id} is built by compiler ${CMAKE_CXX_COMPILER_ID} (${CMAKE_CXX_COMPILER}) version ${CMAKE_CXX_COMPILER_VERSION}\"
 		},
-		${_sbom_gen_pkg_license},
-		${_sbom_gen_pkg_license_declared},
-		${_sbom_gen_pkg_license_concluded},
 \${SBOM_PACKAGE_LIST},
-\${SBOM_PACKAGE_CONTENT_LIST}
+\${SBOM_PACKAGE_CONTENT_LIST},
+\${SBOM_LICENSE_LIST}
 	]
 }"
 	)
@@ -835,6 +841,91 @@ function(_sbom_parse_filetype file_type_arg out_filetype_list)
 	endforeach()
 
 	set(${out_filetype_list} "${${out_filetype_list}}" PARENT_SCOPE)
+endfunction()
+
+function(_sbom_generate_license_snippet)
+	set(one_value_arg "SPDXID" "SPDXID_PATH" "LICENSE_OBJECT")
+	cmake_parse_arguments(_arg "" "${one_value_arg}" "" ${ARGN})
+
+	foreach(val IN LISTS one_value_arg)
+		if(NOT DEFINED _arg_${val})
+			_sbom_log(FATAL_ERROR "Missing argument ${val}" )
+		endif()
+	endforeach()
+
+	_sbom_append_sbom_snippet("${_arg_SPDXID_PATH}.cmake")
+
+	_sbom_inplace_quote_escape( "_arg_LICENSE_OBJECT" )
+
+	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
+	file(
+		GENERATE
+		OUTPUT "${_sbom_snippet_dir}/${_arg_SPDXID_PATH}.cmake"
+		CONTENT
+"
+\# This file is generated by _sbom_generate_license_snippet().
+
+\# Add elements to the document and software package lists
+\# Required in finalization step to generate the final SBOM.
+list(APPEND SBOM_DOCUMENT_ELEMENT_LIST \"${_arg_SPDXID}\")
+list(APPEND SBOM_SOFTWARE_PKG_ELEMENT_LIST \"${_arg_SPDXID}\")
+
+list(APPEND SBOM_LICENSE_LIST \"${_arg_LICENSE_OBJECT}\")
+"
+	)
+
+endfunction()
+
+function(_sbom_register_license OUT_VAR)
+	set(one_value_arg "LICENSE_ID")
+	cmake_parse_arguments(_arg "" "${one_value_arg}" "" ${ARGN})
+	if(NOT DEFINED _arg_LICENSE_ID)
+		_sbom_log(FATAL_ERROR "Missing required argument LICENSE_ID")
+	endif()
+
+	if("${_arg_LICENSE_ID}" STREQUAL "NONE")
+		set(_arg_LICENSE_ID "NoneLicense")
+	elseif("${_arg_LICENSE_ID}" STREQUAL "NOASSERTION")
+		set(_arg_LICENSE_ID "NoAssertionLicense")
+	endif()
+
+	get_property(_sbom_license_list GLOBAL PROPERTY SBOM_LICENSE_LIST)
+	list(FIND _sbom_license_list "${_arg_LICENSE_ID}" _license_index)
+	if(_license_index GREATER -1)
+		# this license was already parsed
+		# causes cmake error if we generate the same file multiple times
+		set("${OUT_VAR}" "FOUND" PARENT_SCOPE)
+		return()
+	endif()
+
+	list(APPEND _sbom_license_list "${_arg_LICENSE_ID}")
+	set_property(GLOBAL PROPERTY SBOM_LICENSE_LIST "${_sbom_license_list}")
+
+	_sbom_serialize_license_entry(
+		LICENSE_ID "${_arg_LICENSE_ID}"
+		OUT_VAR    license_entry
+	)
+	set("${OUT_VAR}" "${license_entry}" PARENT_SCOPE)
+	_sbom_propagate_spdxid_to_parentscope()
+endfunction()
+
+# this function should be called each time we parse a license,
+# to create a license entry and add it to the list of licenses that will be included
+# in the final SBOM.
+# We keep track of the parsed licenses in a global property SBOM_LICENSE_LIST to avoid duplicates,
+function(_sbom_add_license)
+	_sbom_register_license( license_obj_str "${ARGN}")
+	if(license_obj_str STREQUAL "FOUND")
+		# this license was already parsed, no need to generate a new snippet
+		return()
+	endif()
+
+	_sbom_generate_license_snippet(
+		LICENSE_OBJECT "${license_obj_str}"
+		SPDXID         "${SBOM_LAST_SPDXID}"
+		SPDXID_PATH    "${SBOM_LAST_SPDXID_PATH}"
+	)
+	_sbom_propagate_spdxid_to_parentscope()
 endfunction()
 
 # Starts SBOM generation. Call sbom_add() and friends afterwards. End with sbom_finalize(). Input
@@ -994,9 +1085,10 @@ function(sbom_generate)
 	set(_sbom_intermediate_file "$<CONFIG>/sbom.json.in")
 	set(_sbom_document_template "SPDXRef-DOCUMENT.json.in")
 
+	_sbom_append_sbom_snippet("setup.cmake")
+
 	_sbom_generate_spdx3_template()
 
-	_sbom_append_sbom_snippet("setup.cmake")
 	file(GENERATE
 		OUTPUT ${SBOM_SNIPPET_DIR}/setup.cmake
 		CONTENT "
@@ -1034,6 +1126,9 @@ set(SBOM_PACKAGE_LIST \"\")
 \# contains the list of all files that make up the package this cmakeproject produces
 \# populated via sbom_add_file, sbom_add_directory, and sbom_add_target
 set(SBOM_PACKAGE_CONTENT_LIST \"\")
+
+\# contains the list of all licences mentioned in the SBOM
+set(SBOM_LICENSE_LIST \"\")
 "
 	)
 endfunction()
@@ -1082,6 +1177,7 @@ _sbom_cmakelist_to_printable_list(\"SBOM_SOFTWARE_PKG_ELEMENT_LIST\")
 
 _sbom_cmakelist_to_printable_list(\"SBOM_PACKAGE_LIST\")
 _sbom_cmakelist_to_printable_list(\"SBOM_PACKAGE_CONTENT_LIST\")
+_sbom_cmakelist_to_printable_list(\"SBOM_LICENSE_LIST\")
 
 configure_file(\"\${SBOM_INTERMEDIATE_FILE}\" \"\${SBOM_EXPORT_FILENAME}\")
 "
@@ -1124,7 +1220,7 @@ function(_sbom_add_pkg_content PATH)
 
 	sbom_gen_spdxid("${PATH}" "Package/File" "_arg_add_pkg_content_SPDXID")
 
-	set(SBOM_LAST_SPDXID "${_arg_add_pkg_content_SPDXID}")
+	set(y "${_arg_add_pkg_content_SPDXID}")
 	set(SBOM_LAST_SPDXID "${_arg_add_pkg_content_SPDXID}" PARENT_SCOPE)
 
 	set(_properties "")
@@ -1256,17 +1352,17 @@ endforeach()
 "
 	)
 
-	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
+	_sbom_propagate_spdxid_to_parentscope()
 endfunction()
 
 function(sbom_add_directory DIR_PATH)
 	_sbom_add_pkg_content("${DIR_PATH}" "DIR" "${ARGN}")
-	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
+	_sbom_propagate_spdxid_to_parentscope()
 endfunction()
 
 function(sbom_add_file FILENAME)
 	_sbom_add_pkg_content("${FILENAME}" "${ARGN}")
-	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
+	_sbom_propagate_spdxid_to_parentscope()
 endfunction()
 
 # Append a target output to the SBOM. Use this after calling sbom_generate().
@@ -1303,7 +1399,7 @@ function(sbom_add_target NAME)
 		_sbom_log(FATAL_ERROR "Unsupported target type ${_type}")
 	endif()
 
-	set(SBOM_LAST_SPDXID "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
+	_sbom_propagate_spdxid_to_parentscope()
 endfunction()
 
 # Append a package (without files) to the SBOM. Use this after calling sbom_generate().
@@ -1335,12 +1431,11 @@ function(sbom_add_package NAME)
 
 	if(NOT DEFINED _arg_add_pkg_SPDXID)
 		sbom_gen_spdxid( "${NAME}" "Package" "_arg_add_pkg_SPDXID")
+		set(_arg_add_pkg_SPDXID_PATH ${SBOM_LAST_SPDXID_PATH})
 	endif()
 
-	set(SBOM_LAST_SPDXID ${_arg_add_pkg_SPDXID})
-	set(SBOM_LAST_SPDXID ${_arg_add_pkg_SPDXID} PARENT_SCOPE)
+	_sbom_propagate_spdxid_to_parentscope()
 
-	set(_arg_add_pkg_LICENSE_DECLARED "NOASSERTION")
 	if(NOT DEFINED _arg_add_pkg_LICENSE)
 		_sbom_log(FATAL_ERROR "Missing LICENSE argument for package ${NAME}.")
 	endif()
@@ -1350,8 +1445,10 @@ function(sbom_add_package NAME)
 		OUT_DECLARED _arg_add_pkg_LICENSE_DECLARED
 		OUT_COMMENT _arg_add_pkg_LICENSE_COMMENT
 	)
+	_sbom_add_license(LICENSE_ID "${_arg_add_pkg_LICENSE_CONCLUDED}")
+	set(_sbom_add_pkg_license_concluded_spdxid "${SBOM_LAST_SPDXID}")
 
-	# TODO: add license comment
+	# TODO: add license comment to concluded license relation
 	# TODO: correct spdxids for licenses
 	# TODO: creation info string
 	_sbom_serialize_relationship("creation_info"
@@ -1418,10 +1515,10 @@ function(sbom_add_package NAME)
 
 	_sbom_inplace_quote_escape( "_sbom_add_pkg_package" )
 
-	_sbom_append_sbom_snippet("${SBOM_LAST_SPDXID_PATH}.cmake")
+	_sbom_append_sbom_snippet("${_arg_add_pkg_SPDXID_PATH}.cmake")
 	file(
 		GENERATE
-		OUTPUT "${_sbom_snippet_dir}/${SBOM_LAST_SPDXID_PATH}.cmake"
+		OUTPUT "${_sbom_snippet_dir}/${_arg_add_pkg_SPDXID_PATH}.cmake"
 		CONTENT
 "
 \# This file is generated by sbom_add_package() for package ${NAME}.

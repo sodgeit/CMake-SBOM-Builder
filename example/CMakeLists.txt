@@ -32,6 +32,12 @@ sbom_generate(
 
 # mention the dependencies used in the SBOM
 sbom_add_package(
+	some_dep
+	VERSION 1.1.1
+	SUPPLIER PERSON "example person"
+	LICENSE LGPL3.0
+)
+sbom_add_package(
 	cxxopts
 	VERSION 3.2.0
 	SUPPLIER PERSON "Jarryd Beck"
