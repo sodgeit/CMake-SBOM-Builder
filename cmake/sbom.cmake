@@ -10,7 +10,6 @@ include(GNUInstallDirs)
 find_package(Git)
 
 set(SBOM_BUILDER_VERSION "0.0.0-development-version" CACHE STRING "CMake-SBOM-Builder version")
-set(SBOM_BUILDER_UUID_NAMESPACE "7655e89c-9e89-46ae-8966-1aed9d3b54cf" CACHE INTERNAL "CMake-SBOM-Builder UUID namespace")
 
 if(SBOM_BUILDER_VERSION MATCHES "development-version")
 	message( WARNING "Your project is using an unstable development version of CMake-SBOM-Builder. \
@@ -253,9 +252,10 @@ macro(_sbom_cmakelist_to_printable_list var)
 	list(JOIN "${var}" ",\\n" "${var}")
 endmacro()
 
-function(sbom_gen_spdxid_uuid out_uuid name )
-	string(UUID out_var NAMESPACE "${SBOM_BUILDER_UUID_NAMESPACE}" NAME ${name} TYPE SHA1)
-	set(${out_uuid} "urn:uuid:${out_var}" PARENT_SCOPE)
+function(sbom_gen_spdxid VARIABLE SCOPE OUT_VAR)
+	set("${OUT_VAR}" "spdx://sbom/${SCOPE}/${VARIABLE}" PARENT_SCOPE)
+	set("SBOM_LAST_SPDXID" "${OUT_VAR}" PARENT_SCOPE)
+	set("SBOM_LAST_SPDXID_PATH" "${SCOPE}/${VARIABLE}" PARENT_SCOPE)
 endfunction()
 
 # Sets the given variable to a unique SPDIXID-compatible value.
@@ -377,7 +377,7 @@ function(_sbom_serialize_package_notes _package_notes _output_var)
 endfunction()
 
 function(_sbom_serialize_creator_tool creation_property out_var out_spdxid_var)
-	sbom_gen_spdxid_uuid(_creation_tool_id "CMake-SBOM-Builder-${SBOM_BUILDER_VERSION}")
+	sbom_gen_spdxid( "CMake-SBOM-Builder-${SBOM_BUILDER_VERSION}" "Agent" "_creation_tool_id")
 
 	set( out "
 {
@@ -412,7 +412,7 @@ function(_sbom_serialize_creator creator creation_property out_var out_spdxid_va
 		set(creator_name "${_arg_CREATOR_ORGANIZATION}")
 	endif()
 
-	sbom_gen_spdxid_uuid(_creator_spdxid "Creator-${creator_type}-${creator_name}")
+	sbom_gen_spdxid("${creator_name}" "Agent/${creator_type}" "_creator_spdxid")
 
 	set(_email_obj FALSE)
 	set(_email_obj_txt "")
@@ -442,8 +442,6 @@ endfunction()
 function(_sbom_serialize_creation_info creator_spdxid creator_tool_spdxid out_var out_id_var)
 	set(_creation_info_id "_:creationInfo")
 
-	sbom_gen_spdxid_uuid(_creation_creator_id   "Creator-Tool-CMake-SBOM-Builder")
-
 set( out "
 {
 	\"type\":\"CreationInfo\",
@@ -465,7 +463,7 @@ endfunction()
 
 function(_sbom_serialize_license_entry creation_info license_id out_var out_id_var)
 	set(spdx_id "")
-	sbom_gen_spdxid_uuid(spdx_id "License-${license_id}")
+	sbom_gen_spdxid("${license_id}" "License" "spdx_id")
 
 	set(license_entry "{
 		${creation_info},
@@ -479,7 +477,7 @@ endfunction()
 
 function(_sbom_serialize_relationship creation_info reltype from to out_var out_id_var)
 	set(spdx_id "")
-	sbom_gen_spdxid_uuid(spdx_id "Relationship-${from}-${to}-${reltype}")
+	sbom_gen_spdxid("${from}-${to}-${reltype}" "Relationship" spdx_id)
 
 	set(rel "{
 		${creation_info},
@@ -562,11 +560,11 @@ macro(_sbom_generate_spdx3_template)
 
 	set(_creation_info_property "\"creationInfo\":\"_:creationInfo\"")
 
-	sbom_gen_spdxid_uuid(_creation_creator_id   "Creator-${_creator_type}-${_creator_name}")
-	sbom_gen_spdxid_uuid(_spdx_document_id      "Document")
-	sbom_gen_spdxid_uuid(_spdx_software_pkg_id  "software_Package")
-	sbom_gen_spdxid_uuid(_spdx_software_sbom_id "software_Sbom")
-	sbom_gen_spdxid_uuid(_spdx_software_pkg_compiler_id "software_Package-compiler-${CMAKE_CXX_COMPILER_ID}")
+	sbom_gen_spdxid( "${_creator_type}-${_creator_name}" "Agent" "_creation_creator_id")
+	sbom_gen_spdxid( "Document" "" "_spdx_document_id")
+	sbom_gen_spdxid( "Package" "" "_spdx_software_pkg_id")
+	sbom_gen_spdxid( "BOM1" "" "_spdx_software_sbom_id")
+	sbom_gen_spdxid( "Compiler-${CMAKE_CXX_COMPILER_ID}" "Package" "_spdx_software_pkg_compiler_id")
 
 	_sbom_serialize_creator_tool(
 		"${_creation_info_property}"
@@ -588,7 +586,7 @@ macro(_sbom_generate_spdx3_template)
 		_sbom_gen_creation_info_id
 	)
 
-	# TODO licenses are weird. Every lincense needs to be defined as its own object.
+	# TODO licenses are weird. Every license needs to be defined as its own object.
 	# All pkg then refer to that license using relations.
 	# Will be interesting to see how to handle multiple pkg that use the same license.
 	# Need to look if the license is already defined and then reuse that object. or something like that
@@ -1116,11 +1114,8 @@ function(_sbom_add_pkg_content PATH)
 		_sbom_log(FATAL_ERROR "Unknown arguments: ${_arg_add_pkg_content_UNPARSED_ARGUMENTS}")
 	endif()
 
-	sbom_spdxid(
-		VARIABLE _arg_add_pkg_content_SPDXID
-		CHECK "${_arg_add_pkg_content_SPDXID}"
-		HINTS "SPDXRef-${PATH}"
-	)
+	sbom_gen_spdxid("${PATH}" "Package/File" "_arg_add_pkg_content_SPDXID")
+
 	set(SBOM_LAST_SPDXID "${_arg_add_pkg_content_SPDXID}")
 	set(SBOM_LAST_SPDXID "${_arg_add_pkg_content_SPDXID}" PARENT_SCOPE)
 
@@ -1163,10 +1158,10 @@ function(_sbom_add_pkg_content PATH)
 
 	get_property(_sbom_snippet_dir GLOBAL PROPERTY SBOM_SNIPPET_DIR)
 
-	_sbom_append_sbom_snippet("${SBOM_LAST_SPDXID}.cmake")
+	_sbom_append_sbom_snippet("${SBOM_LAST_SPDXID_PATH}.cmake")
 	file(
 		GENERATE
-		OUTPUT ${_sbom_snippet_dir}/${SBOM_LAST_SPDXID}.cmake
+		OUTPUT ${_sbom_snippet_dir}/${SBOM_LAST_SPDXID_PATH}.cmake
 		CONTENT
 		"
 cmake_policy(SET CMP0011 NEW)
@@ -1331,7 +1326,7 @@ function(sbom_add_package NAME)
 #	endif()
 
 	if(NOT DEFINED _arg_add_pkg_SPDXID)
-		sbom_gen_spdxid_uuid( _arg_add_pkg_SPDXID "Package-${NAME}" )
+		sbom_gen_spdxid( "${NAME}" "Package" "_arg_add_pkg_SPDXID")
 	endif()
 
 	set(SBOM_LAST_SPDXID ${_arg_add_pkg_SPDXID})
@@ -1409,10 +1404,10 @@ function(sbom_add_package NAME)
 
 	_sbom_inplace_quote_escape( "_sbom_add_pkg_package" )
 
-	_sbom_append_sbom_snippet("${_arg_add_pkg_SPDXID}.cmake")
+	_sbom_append_sbom_snippet("${SBOM_LAST_SPDXID_PATH}.cmake")
 	file(
 		GENERATE
-		OUTPUT ${_sbom_snippet_dir}/${_arg_add_pkg_SPDXID}.cmake
+		OUTPUT "${_sbom_snippet_dir}/${SBOM_LAST_SPDXID_PATH}.cmake"
 		CONTENT
 "
 \# This file is generated by sbom_add_package() for package ${NAME}.
