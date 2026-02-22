@@ -740,27 +740,35 @@ function(_sbom_parse_package_supplier pkg_supplier_arg out_supplier_type out_sup
 	endif()
 endfunction()
 
-function(_sbom_parse_license pkg_license_arg out_license_concluded out_license_declared out_license_comment)
-	cmake_parse_arguments(_arg_license "" "CONCLUDED;DECLARED;COMMENT" "" ${pkg_license_arg})
+function(_sbom_parse_license_argument)
+	set(optional_one_value_args "CONCLUDED;DECLARED;COMMENT")
+	set(required_one_value_args "OUT_CONCLUDED;OUT_DECLARED;OUT_COMMENT")
+	cmake_parse_arguments(_arg_license "" "${optional_one_value_args};${required_one_value_args}" "" ${ARGN})
 
-	if(_arg_license_UNPARSED_ARGUMENTS)
-		_sbom_log(FATAL_ERROR "Unknown subarguments for LICENSE: ${_arg_license_UNPARSED_ARGUMENTS}")
+	set(missing_required_args "")
+	foreach(req_arg IN LISTS required_one_value_args)
+		if(NOT DEFINED _arg_license_${req_arg})
+			string(APPEND missing_required_args "${req_arg} ")
+		endif()
+	endforeach()
+	if(NOT "${missing_required_args}" STREQUAL "")
+		_sbom_log(FATAL_ERROR "Missing required arguments: ${missing_required_args}")
 	endif()
 
 	if(DEFINED _arg_license_CONCLUDED)
-		set(${out_license_concluded} "${_arg_license_CONCLUDED}" PARENT_SCOPE)
+		set(${_arg_license_OUT_CONCLUDED} "${_arg_license_CONCLUDED}" PARENT_SCOPE)
 	else()
-		set(${out_license_concluded} "NOASSERTION" PARENT_SCOPE)
+		set(${_arg_license_OUT_CONCLUDED} "NOASSERTION" PARENT_SCOPE)
 	endif()
 
 	if(DEFINED _arg_license_DECLARED)
-		set(${out_license_declared} "${_arg_license_DECLARED}" PARENT_SCOPE)
+		set(${_arg_license_OUT_DECLARED} "${_arg_license_DECLARED}" PARENT_SCOPE)
 	else()
-		set(${out_license_declared} "NOASSERTION" PARENT_SCOPE)
+		set(${_arg_license_OUT_DECLARED} "NOASSERTION" PARENT_SCOPE)
 	endif()
 
 	if(DEFINED _arg_license_COMMENT)
-		set(${out_license_comment} "${_arg_license_COMMENT}" PARENT_SCOPE)
+		set(${_arg_license_OUT_COMMENT} "${_arg_license_COMMENT}" PARENT_SCOPE)
 	endif()
 endfunction()
 
@@ -1336,7 +1344,13 @@ function(sbom_add_package NAME)
 	if(NOT DEFINED _arg_add_pkg_LICENSE)
 		_sbom_log(FATAL_ERROR "Missing LICENSE argument for package ${NAME}.")
 	endif()
-	_sbom_parse_license("CONCLUDED;${_arg_add_pkg_LICENSE}" _arg_add_pkg_LICENSE_CONCLUDED _arg_add_pkg_LICENSE_DECLARED _arg_add_pkg_LICENSE_COMMENT)
+	_sbom_parse_license_argument(
+		"CONCLUDED;${_arg_add_pkg_LICENSE}"
+		OUT_CONCLUDED _arg_add_pkg_LICENSE_CONCLUDED
+		OUT_DECLARED _arg_add_pkg_LICENSE_DECLARED
+		OUT_COMMENT _arg_add_pkg_LICENSE_COMMENT
+	)
+
 	# TODO: add license comment
 	# TODO: correct spdxids for licenses
 	# TODO: creation info string

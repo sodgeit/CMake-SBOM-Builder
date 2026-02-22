@@ -11,5 +11,7 @@ project(CMake-SBOM-Builder)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" )
 
+enable_testing()
+
 add_subdirectory(example)
 add_subdirectory(test)
