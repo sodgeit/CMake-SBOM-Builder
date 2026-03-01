@@ -49,7 +49,6 @@ Major Changes include:
 	- [`sbom_add_package`](#sbom_add_package)
 	- [`sbom_add_external`](#sbom_add_external)
 	- [`sbom_finalize`](#sbom_finalize)
-	- [`sbom_spdxid`](#sbom_spdxid)
 - [Version Extraction](#version-extraction)
 	- [`version_extract()`](#version_extract)
 	- [`version_generate()`](#version_generate)
@@ -292,25 +291,6 @@ Finalize the SBOM.
 ```cmake
 sbom_finalize()
 ```
-
-### `sbom_spdxid`
-
-***This should rarely be used directly.*** All sbom_add_* functions will use this function to automatically generate unique SPDX identifiers.
-
-Generate a unique SPDX identifier.
-
-```cmake
-sbom_spdxid(
-   VARIABLE <variable_name>
-   [CHECK <id> | HINTS <hint>...]
-)
-```
-
-- `VARIABLE`: The output variable to generate a unique SDPX identifier in.
-- `CHECK`: Verify and return the given identifier.
-- `HINTS`: One or more hints, which are converted into a valid identifier. The first non-empty hint is used. If no hint is specified, a unique identifier is returned, with unspecified format.
-
----
 
 ## Version Extraction
 

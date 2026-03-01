@@ -257,58 +257,45 @@ macro(_sbom_propagate_spdxid_to_parentscope)
 	set(SBOM_LAST_SPDXID_PATH "${SBOM_LAST_SPDXID_PATH}" PARENT_SCOPE)
 endmacro()
 
-function(sbom_gen_spdxid VARIABLE SCOPE OUT_VAR)
-	set("${OUT_VAR}" "spdx://sbom/${SCOPE}/${VARIABLE}" PARENT_SCOPE)
-	set(SBOM_LAST_SPDXID "spdx://sbom/${SCOPE}/${VARIABLE}")
-	set(SBOM_LAST_SPDXID_PATH "${SCOPE}/${VARIABLE}")
+# Generates an URI-based SPDXID.
+#
+# _sbom_gen_spdxid(SCOPE <str> VARIABLE <str>)
+#
+# `SCOPE` is used to create a sort of namespace for the generated SPDXID, which reflect
+# the hierarchy of the SBOM elements. E.g. "Document", "Agent", "Package", "Relationship", "License" etc.
+# `VARIABLE` is a string which will be appended to the SCOPE to create the final SPDXID.
+#
+# In most cases this is simply the name of the element, e.g. the name of the license or package.
+# For some elements `VARIABLE` takes a more complex value to guarantee uniqueness.
+# e.g. for relationships: `hasConcludedLicense/from/package/some_deps/to/License/MIT`
+# In some cases, e.g. for the root document element, `VARIABLE` can be left empty,
+# and the SPDXID will just be based on the SCOPE.
+# Because the SCOPE/VARIABLE will be used in filepaths as well, potentially problematic
+# characters will be replaced with dashes.
+#
+# Note: Sets SBOM_LAST_SPDXID and SBOM_LAST_SPDXID_PATH variables as side effect,
+#       in the parent scope of the caller.
+#       SBOM_LAST_SPDXID will contain the full URI, while SBOM_LAST_SPDXID_PATH
+#       will contain the path part without the generic uri prefix for use in filepaths.
+function(_sbom_gen_spdxid)
+	cmake_parse_arguments(_arg "" "SCOPE;VARIABLE" "" ${ARGN})
+
+	if(_arg_UNPARSED_ARGUMENTS)
+		_sbom_log(FATAL_ERROR "Unknown arguments for _sbom_gen_spdxid: ${_arg_UNPARSED_ARGUMENTS}.")
+	endif()
+
+	# TODO probably should come up with a better prefix
+	set(prefix "spdx://sbom/v1")
+	string(REGEX REPLACE "[^a-zA-Z0-9_]+" "-" _arg_SCOPE "${_arg_SCOPE}")
+	set(tmp "${_arg_SCOPE}")
+	# to get aroung double '//' in some cases
+	if(DEFINED _arg_VARIABLE)
+		string(REGEX REPLACE "[^a-zA-Z0-9_]+" "-" _arg_VARIABLE "${_arg_VARIABLE}")
+		string(APPEND tmp "/${_arg_VARIABLE}")
+	endif()
+	set(SBOM_LAST_SPDXID "${prefix}/${tmp}")
+	set(SBOM_LAST_SPDXID_PATH "${tmp}")
 	_sbom_propagate_spdxid_to_parentscope()
-endfunction()
-
-# Sets the given variable to a unique SPDIXID-compatible value.
-function(sbom_spdxid)
-	set(oneValueArgs VARIABLE CHECK)
-	set(multiValueArgs HINTS)
-
-	cmake_parse_arguments(
-		SBOM_SPDXID "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
-	)
-
-	if(SBOM_SPDXID_UNPARSED_ARGUMENTS)
-		_sbom_log(FATAL_ERROR "Unknown arguments: ${SBOM_SPDXID_UNPARSED_ARGUMENTS}")
-	endif()
-
-	if(NOT DEFINED SBOM_SPDXID_VARIABLE)
-		_sbom_log(FATAL_ERROR "Missing VARIABLE")
-	endif()
-
-	if("${SBOM_SPDXID_CHECK}" STREQUAL "")
-		get_property(_spdxids GLOBAL PROPERTY sbom_spdxids)
-		set(_suffix "-${_spdxids}")
-		math(EXPR _spdxids "${_spdxids} + 1")
-		set_property(GLOBAL PROPERTY sbom_spdxids "${_spdxids}")
-
-		foreach(_hint IN LISTS SBOM_SPDXID_HINTS)
-			string(REGEX REPLACE "[^a-zA-Z0-9]+" "-" _id "${_hint}")
-			string(REGEX REPLACE "-+$" "" _id "${_id}")
-
-			if(NOT "${_id}" STREQUAL "")
-				set(_id "${_id}${_suffix}")
-				break()
-			endif()
-		endforeach()
-
-		if("${_id}" STREQUAL "")
-			set(_id "SPDXRef${_suffix}")
-		endif()
-	else()
-		set(_id "${SBOM_SPDXID_CHECK}")
-	endif()
-
-	if(NOT "${_id}" MATCHES "^SPDXRef-[-a-zA-Z0-9]+$")
-		_sbom_log(FATAL_ERROR "Invalid SPDXID \"${_id}\"")
-	endif()
-
-	set(${SBOM_SPDXID_VARIABLE} "${_id}" PARENT_SCOPE)
 endfunction()
 
 function(_sbom_serialize_package_dates package_dates out_var)
@@ -383,19 +370,22 @@ function(_sbom_serialize_package_notes _package_notes _output_var)
 endfunction()
 
 function(_sbom_serialize_creator_tool creation_property out_var out_spdxid_var)
-	sbom_gen_spdxid( "CMake-SBOM-Builder-${SBOM_BUILDER_VERSION}" "Agent" "_creation_tool_id")
+	_sbom_gen_spdxid(
+		VARIABLE "CMake-SBOM-Builder-${SBOM_BUILDER_VERSION}"
+		SCOPE "Agent"
+	)
 
 	set( out "
 {
 	${creation_property},
 	\"type\":\"Tool\",
 	\"name\":\"CMake-SBOM-Builder-${SBOM_BUILDER_VERSION}\",
-	\"spdxId\":\"${_creation_tool_id}\"
+	\"spdxId\":\"${SBOM_LAST_SPDXID}\"
 }"
 	)
 
 	set(${out_var} "${out}" PARENT_SCOPE)
-	set(${out_spdxid_var} "${_creation_tool_id}" PARENT_SCOPE)
+	set(${out_spdxid_var} "${SBOM_LAST_SPDXID}" PARENT_SCOPE)
 endfunction()
 
 function(_sbom_serialize_creator creator creation_property out_var out_spdxid_var)
@@ -418,7 +408,11 @@ function(_sbom_serialize_creator creator creation_property out_var out_spdxid_va
 		set(creator_name "${_arg_CREATOR_ORGANIZATION}")
 	endif()
 
-	sbom_gen_spdxid("${creator_name}" "Agent/${creator_type}" "_creator_spdxid")
+	_sbom_gen_spdxid(
+		VARIABLE "${creator_type}/${creator_name}"
+		SCOPE "Agent"
+	)
+	set(_creator_spdxid "${SBOM_LAST_SPDXID}")
 
 	set(_email_obj FALSE)
 	set(_email_obj_txt "")
@@ -477,7 +471,10 @@ function(_sbom_serialize_license_entry)
 		endif()
 	endforeach()
 
-	sbom_gen_spdxid("${_arg_LICENSE_ID}" "License" "spdx_id")
+	_sbom_gen_spdxid(
+		VARIABLE "${_arg_LICENSE_ID}"
+		SCOPE "License"
+	)
 
 	set(properties "")
 	list(APPEND properties
@@ -497,7 +494,7 @@ endfunction()
 
 function(_sbom_serialize_relationship OUT_VAR)
 	set(optional_one_value_arg "COMMENT")
-	set(one_value_args "RELTYPE" "FROM" "TO")
+	set(one_value_args "RELTYPE" "FROM" "TO" "FROM_ID" "TO_ID")
 	cmake_parse_arguments( _arg "" "${one_value_args};${optional_one_value_arg}" "" "${ARGN}" )
 
 	foreach(arg IN LISTS one_value_args)
@@ -506,15 +503,18 @@ function(_sbom_serialize_relationship OUT_VAR)
 		endif()
 	endforeach()
 
-	sbom_gen_spdxid("${_arg_FROM}-${_arg_TO}" "Relationship/${_arg_RELTYPE}" spdx_id)
+	_sbom_gen_spdxid(
+		VARIABLE "${_arg_RELTYPE}/from/${_arg_FROM}/to/${_arg_TO}"
+		SCOPE "Relationship"
+	)
 
 	set(properties "")
 	list(APPEND properties
 		"\"creationInfo\":\"_:creationInfo\""
 		"\"type\": \"Relationship\""
 		"\"spdxId\": \"${SBOM_LAST_SPDXID}\""
-		"\"from\": \"${_arg_FROM}\""
-		"\"to\": [\"${_arg_TO}\"]"
+		"\"from\": \"${_arg_FROM_ID}\""
+		"\"to\": [\"${_arg_TO_ID}\"]"
 		"\"relationshipType\": \"${_arg_RELTYPE}\""
 	)
 	if(DEFINED _arg_COMMENT)
@@ -599,11 +599,23 @@ macro(_sbom_generate_spdx3_template)
 
 	set(_creation_info_property "\"creationInfo\":\"_:creationInfo\"")
 
-	sbom_gen_spdxid( "${_creator_type}-${_creator_name}" "Agent" "_creation_creator_id")
-	sbom_gen_spdxid( "Document" "" "_spdx_document_id")
-	sbom_gen_spdxid( "Package" "" "_spdx_software_pkg_id")
-	sbom_gen_spdxid( "BOM1" "" "_spdx_software_sbom_id")
-	sbom_gen_spdxid( "Compiler-${CMAKE_CXX_COMPILER_ID}" "Package" "_spdx_software_pkg_compiler_id")
+	_sbom_gen_spdxid(
+		VARIABLE "${_creator_type}-${_creator_name}"
+		SCOPE "Agent"
+	)
+	set(_creation_creator_id "${SBOM_LAST_SPDXID}")
+	_sbom_gen_spdxid( SCOPE "Document")
+	set(_spdx_document_id "${SBOM_LAST_SPDXID}")
+	_sbom_gen_spdxid( SCOPE "Package")
+	set(_spdx_software_pkg_id "${SBOM_LAST_SPDXID}")
+	set(_spdx_software_pkg_id_path "${SBOM_LAST_SPDXID_PATH}")
+	_sbom_gen_spdxid( SCOPE "BOM1")
+	set(_spdx_software_sbom_id "${SBOM_LAST_SPDXID}")
+	_sbom_gen_spdxid(
+		VARIABLE "Compiler-${CMAKE_CXX_COMPILER_ID}"
+		SCOPE "Package"
+	)
+	set(_spdx_software_pkg_compiler_id "${SBOM_LAST_SPDXID}")
 
 	_sbom_serialize_creator_tool(
 		"${_creation_info_property}"
@@ -627,16 +639,21 @@ macro(_sbom_generate_spdx3_template)
 
 	_sbom_add_license(LICENSE_ID "${_arg_sbom_gen_PACKAGE_LICENSE}")
 	set(_sbom_gen_pkg_license_spdxid "${SBOM_LAST_SPDXID}")
+	set(_sbom_gen_pkg_license_spdxid_path "${SBOM_LAST_SPDXID_PATH}")
 
 	_sbom_add_relationship(
 		RELTYPE hasConcludedLicense
-		FROM "${_spdx_software_pkg_id}"
-		TO "${_sbom_gen_pkg_license_spdxid}"
+		FROM_ID "${_spdx_software_pkg_id}"
+		TO_ID "${_sbom_gen_pkg_license_spdxid}"
+		FROM "${_spdx_software_pkg_id_path}"
+		TO "${_sbom_gen_pkg_license_spdxid_path}"
 	)
 	_sbom_add_relationship(
 		RELTYPE hasDeclaredLicense
-		FROM "${_spdx_software_pkg_id}"
-		TO "${_sbom_gen_pkg_license_spdxid}"
+		FROM_ID "${_spdx_software_pkg_id}"
+		TO_ID "${_sbom_gen_pkg_license_spdxid}"
+		FROM "${_spdx_software_pkg_id_path}"
+		TO "${_sbom_gen_pkg_license_spdxid_path}"
 	)
 
 	set(_sbom_doc_elem_list
@@ -866,9 +883,6 @@ function(_sbom_generate_relation_snippet)
 		endif()
 	endforeach()
 
-	# TODO add spdxid to path function in order to make this path usable
-	# the spdxid of relation is build from spdxid of from and to objects
-
 	_sbom_append_sbom_snippet("${_arg_SPDXID_PATH}.cmake")
 
 	_sbom_inplace_quote_escape( "_arg_RELATION_OBJECT" )
@@ -977,7 +991,7 @@ endfunction()
 # this function should be called each time we parse a license,
 # to create a license entry and add it to the list of licenses that will be included
 # in the final SBOM.
-# We keep track of the parsed licenses in a global property SBOM_LICENSE_LIST to avoid duplicates,
+# We keep track of the parsed licenses in a global property SBOM_LICENSE_LIST to avoid duplicates.
 function(_sbom_add_license)
 	_sbom_register_license( license_obj_str "${ARGN}")
 	if(license_obj_str STREQUAL "FOUND")
@@ -1119,9 +1133,6 @@ function(sbom_generate)
 	string(REGEX REPLACE "[^A-Za-z0-9.]+" "-" _arg_sbom_gen_PACKAGE_NAME "${_arg_sbom_gen_PACKAGE_NAME}")
 	# strip - from end of string
 	string(REGEX REPLACE "-+$" "" _arg_sbom_gen_PACKAGE_NAME "${_arg_sbom_gen_PACKAGE_NAME}")
-
-	# Prevent collision with other generated SPDXID with -[0-9]+ suffix, by removing -.
-	string(REGEX REPLACE "-([0-9]+)$" "\\1" _arg_sbom_gen_PACKAGE_NAME "${_arg_sbom_gen_PACKAGE_NAME}")
 
 	set(SBOM_FILENAME "${_arg_sbom_gen_OUTPUT}" PARENT_SCOPE)
 	set(SBOM_BINARY_DIR "${PROJECT_BINARY_DIR}/__sbom")
@@ -1272,8 +1283,7 @@ endmacro()
 
 function(_sbom_add_pkg_content PATH)
 	set(options OPTIONAL FILE DIR)
-	set(oneValueArgs SPDXID
-					 COPYRIGHT
+	set(oneValueArgs COPYRIGHT
 					 COMMENT
 					 NOTICE
 					 CONTRIBUTORS
@@ -1288,10 +1298,10 @@ function(_sbom_add_pkg_content PATH)
 		_sbom_log(FATAL_ERROR "Unknown arguments: ${_arg_add_pkg_content_UNPARSED_ARGUMENTS}")
 	endif()
 
-	sbom_gen_spdxid("${PATH}" "Package/File" "_arg_add_pkg_content_SPDXID")
-
-	set(y "${_arg_add_pkg_content_SPDXID}")
-	set(SBOM_LAST_SPDXID "${_arg_add_pkg_content_SPDXID}" PARENT_SCOPE)
+	_sbom_gen_spdxid(
+		VARIABLE "File/${PATH}"
+		SCOPE "Package"
+	)
 
 	set(_properties "")
 
@@ -1475,7 +1485,6 @@ endfunction()
 # Append a package (without files) to the SBOM. Use this after calling sbom_generate().
 function(sbom_add_package NAME)
 	set(oneValueArgs
-		SPDXID
 		VERSION
 		FILENAME
 		COPYRIGHT
@@ -1495,14 +1504,12 @@ function(sbom_add_package NAME)
 
 	_sbom_builder_is_setup()
 
-#	if(_arg_add_pkg_UNPARSED_ARGUMENTS)
-#		_sbom_log(FATAL_ERROR "Unknown arguments: ${_arg_add_pkg_UNPARSED_ARGUMENTS}")
-#	endif()
-
-	if(NOT DEFINED _arg_add_pkg_SPDXID)
-		sbom_gen_spdxid( "${NAME}" "Package" "_arg_add_pkg_SPDXID")
-		set(_arg_add_pkg_SPDXID_PATH ${SBOM_LAST_SPDXID_PATH})
-	endif()
+	_sbom_gen_spdxid(
+		VARIABLE "${NAME}"
+		SCOPE "Package"
+	)
+	set(_arg_add_pkg_SPDXID ${SBOM_LAST_SPDXID})
+	set(_arg_add_pkg_SPDXID_PATH ${SBOM_LAST_SPDXID_PATH})
 
 	_sbom_propagate_spdxid_to_parentscope()
 
@@ -1523,16 +1530,20 @@ function(sbom_add_package NAME)
 	_sbom_add_license(LICENSE_ID "${_arg_add_pkg_LICENSE_CONCLUDED}")
 	_sbom_add_relationship(
 		RELTYPE "hasConcludedLicense"
-		FROM    "${_arg_add_pkg_SPDXID}"
-		TO      "${SBOM_LAST_SPDXID}"
+		FROM_ID "${_arg_add_pkg_SPDXID}"
+		TO_ID   "${SBOM_LAST_SPDXID}"
+		FROM    "${_arg_add_pkg_SPDXID_PATH}"
+		TO      "${SBOM_LAST_SPDXID_PATH}"
 		COMMENT "${comment}"
 	)
 
 	_sbom_add_license(LICENSE_ID "${_arg_add_pkg_LICENSE_DECLARED}")
 	_sbom_add_relationship(
 		RELTYPE "hasDeclaredLicense"
-		FROM    "${_arg_add_pkg_SPDXID}"
-		TO      "${SBOM_LAST_SPDXID}"
+		FROM_ID "${_arg_add_pkg_SPDXID}"
+		TO_ID   "${SBOM_LAST_SPDXID}"
+		FROM    "${_arg_add_pkg_SPDXID_PATH}"
+		TO      "${SBOM_LAST_SPDXID_PATH}"
 	)
 
 	if(NOT DEFINED _arg_add_pkg_VERSION)

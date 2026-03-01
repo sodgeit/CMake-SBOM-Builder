@@ -19,4 +19,7 @@ add_custom_target(test-verbose COMMAND ${CMAKE_CTEST_COMMAND} -C Debug --verbose
 
 add_sbom_unittest(version_extract.cmake)
 add_sbom_unittest(version_generate.cmake)
+
 add_sbom_unittest(parse_license.cmake)
+
+add_sbom_unittest(spdxid.cmake)
