@@ -670,7 +670,6 @@ macro(_sbom_generate_spdx3_template)
 		OUTPUT "${SBOM_SNIPPET_DIR}/${_sbom_document_template}"
 		CONTENT
 "{
-	\"$schema\":\"/home/avus/Projects/CMake-SBOM-Builder/schema.json\",
 	\"@context\":\"https://spdx.org/rdf/3.0.1/spdx-context.jsonld\",
 	\"@graph\":[
 		${_sbom_gen_creator_tool},
