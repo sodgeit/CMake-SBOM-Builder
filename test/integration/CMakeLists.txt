@@ -1,7 +1,5 @@
 project(IntegrationTests)
 
-add_custom_target(${PROJECT_NAME} ALL)
-
 function(add_integration_test name)
 	set(_dir "${CMAKE_CURRENT_BINARY_DIR}/testcases/${name}")
 	make_directory(${_dir}/src)
@@ -12,22 +10,26 @@ function(add_integration_test name)
 project(${name})"
 	)
 
+	# This is stupid... but,
+	# I cannot reliably determine the actual filename (e.g. it may be overwritten in an integration test)
+	# of the generated sbom.
+	# Also, you cannot (apperantly) use wildcard symbols in a add_test(... COMMAND <something with wildcard symbol *>)
+	# command. This means we cannot reliably call the verifier with the file it's supposed to check.
+	# If we copy it to a known location with a known filename, we can run the verifier against the copy atleast.
+	# TODO figure a better way out for this...
+	# The following runs in the "test context", where SBOM_FILENAME is defined.
 	set(TEST_VERIFY
 "install(CODE
 	\"
-	message(STATUS \\\"Verifying:  \${SBOM_FILENAME}\\\")
+	message(STATUS \\\"Copying:  \${SBOM_FILENAME}\\\")
 	execute_process(
-		COMMAND \\\"pyspdxtools\\\" \\\"-i\\\" \\\"\${SBOM_FILENAME}\\\"
-		ERROR_VARIABLE _output
+		COMMAND \\\"${CMAKE_COMMAND}\\\" \\\"-E\\\" \\\"copy\\\" \\\"\${SBOM_FILENAME}\\\" \\\"${_dir}/install/share/tmp.json\\\"
 	)
-	if(NOT _output STREQUAL \\\"\\\")
-		message(FATAL_ERROR \\\"SPDX verification failed:
-\\\${_output}\\\")
-	endif()\"
+	\"
 )"
 	)
 
-	configure_file("testcases/${name}.cmake" "${_dir}/src/CMakeLists.txt" @ONLY)
+	configure_file("testcases/${name}.cmake" "${_dir}/CMakeLists.txt" @ONLY)
 
 	get_property(_is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 
@@ -39,21 +41,38 @@ project(${name})"
 		set(build_args "--config=$<CONFIG>")
 	endif()
 
-	add_custom_target(
-		"${PROJECT_NAME}-${name}"
-		DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/testcases/${name}.cmake
-		COMMAND
-			${CMAKE_COMMAND} "${_dir}/src" -G "${CMAKE_GENERATOR}"
-			"-DCMAKE_INSTALL_PREFIX=${_dir}/install"
+	add_test(
+		NAME "${name}-Configure"
+		COMMAND ${CMAKE_COMMAND} "-S" "." "-B" "./build"
+			"-G" "${CMAKE_GENERATOR}"
+			"-DCMAKE_INSTALL_PREFIX=./install"
 			"-DCMAKE_MODULE_PATH=${CMAKE_MODULE_PATH}"
 			${configure_args}
-		COMMAND ${CMAKE_COMMAND} --build . --target install ${build_args}
-		WORKING_DIRECTORY "${_dir}/build"
-		COMMENT "Testing ${name}"
-		VERBATIM
+		WORKING_DIRECTORY "${_dir}"
+	)
+	add_test(
+		NAME "${name}-Install"
+		COMMAND ${CMAKE_COMMAND} --build "./build" --target install ${build_args}
+		WORKING_DIRECTORY "${_dir}"
+	)
+	# For some reason '*' can't be used in COMMAND, and we don't know the exact name of the sbom file.
+	# We therefore generate a copy which we check against.
+	add_test(
+		NAME "${name}-Verify"
+		COMMAND "java" "-jar" "${CMAKE_SOURCE_DIR}/spdx-tools/spdxtools" "Verify" "tmp.json"
+		WORKING_DIRECTORY "${_dir}/install/share"
 	)
 
-	add_dependencies(${PROJECT_NAME} "${PROJECT_NAME}-${name}")
+	# Probably abusing test fixtures a bit here.
+	# For integration tests we want to run CMake the same way as a user would.
+	# The actual final test should be the verification of the generated SBOM.
+	# Setup fixtures which do the configure/build/install.
+	# If CMake reports an error during configure/build/install, the verifier will
+	# not run and test will fail.
+	set_tests_properties( "${name}-Configure" PROPERTIES FIXTURES_SETUP "IntegrationTest-${name}")
+	set_tests_properties( "${name}-Install" PROPERTIES DEPENDS "${name}-Configure")
+	set_tests_properties( "${name}-Install" PROPERTIES FIXTURES_SETUP "IntegrationTest-${name}")
+	set_tests_properties( "${name}-Verify" PROPERTIES FIXTURES_REQUIRED "IntegrationTest-${name}")
 endfunction()
 
 add_integration_test(minimal)
