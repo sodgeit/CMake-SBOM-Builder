@@ -55,13 +55,6 @@ project(${name})"
 		COMMAND ${CMAKE_COMMAND} --build "./build" --target install ${build_args}
 		WORKING_DIRECTORY "${_dir}"
 	)
-	# For some reason '*' can't be used in COMMAND, and we don't know the exact name of the sbom file.
-	# We therefore generate a copy which we check against.
-	add_test(
-		NAME "${name}-Verify"
-		COMMAND "java" "-jar" "${CMAKE_SOURCE_DIR}/spdx-tools/spdxtools" "Verify" "tmp.json"
-		WORKING_DIRECTORY "${_dir}/install/share"
-	)
 
 	# Probably abusing test fixtures a bit here.
 	# For integration tests we want to run CMake the same way as a user would.
@@ -72,7 +65,17 @@ project(${name})"
 	set_tests_properties( "${name}-Configure" PROPERTIES FIXTURES_SETUP "IntegrationTest-${name}")
 	set_tests_properties( "${name}-Install" PROPERTIES DEPENDS "${name}-Configure")
 	set_tests_properties( "${name}-Install" PROPERTIES FIXTURES_SETUP "IntegrationTest-${name}")
-	set_tests_properties( "${name}-Verify" PROPERTIES FIXTURES_REQUIRED "IntegrationTest-${name}")
+
+	if(RUN_VERIFICATION)
+	# For some reason '*' can't be used in COMMAND, and we don't know the exact name of the sbom file.
+	# We therefore generate a copy which we check against.
+		add_test(
+			NAME "${name}-Verify"
+			COMMAND "${Java_JAVA_EXECUTABLE}" "-jar" "${Verifier_BIN}" "Verify" "tmp.json"
+			WORKING_DIRECTORY "${_dir}/install/share"
+		)
+		set_tests_properties( "${name}-Verify" PROPERTIES FIXTURES_REQUIRED "IntegrationTest-${name}")
+	endif()
 endfunction()
 
 add_integration_test(minimal)
