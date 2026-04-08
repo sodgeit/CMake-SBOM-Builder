@@ -430,8 +430,8 @@ function(_sbom_serialize_creator creator creation_property out_var out_spdxid_va
 	${creation_property},
 	\"type\":\"${creator_type}\",
 	\"name\":\"${creator_name}\",
-	\"spdxId\":\"${_creator_spdxid}\",
-	$<$<BOOL:${_email_obj}>:\"externalIdentifier\":[${_email_obj_txt}]>
+	\"spdxId\":\"${_creator_spdxid}\"$<$<BOOL:${_email_obj}>:,
+	\"externalIdentifier\":[${_email_obj_txt}]>
 }")
 
 	set(${out_var} "${out}" PARENT_SCOPE)
@@ -727,11 +727,8 @@ macro(_sbom_generate_spdx3_template)
 			\"software_packageVersion\": \"${CMAKE_CXX_COMPILER_VERSION}\",
 			\"summary\": \"The compiler as identified by CMake, running on ${CMAKE_HOST_SYSTEM_NAME} (${CMAKE_HOST_SYSTEM_PROCESSOR})\",
 			\"comment\": \"${_spdx_software_pkg_id} is built by compiler ${CMAKE_CXX_COMPILER_ID} (${CMAKE_CXX_COMPILER}) version ${CMAKE_CXX_COMPILER_VERSION}\"
-		},
-\${SBOM_PACKAGE_LIST},
-\${SBOM_PACKAGE_CONTENT_LIST},
-\${SBOM_LICENSE_LIST},
-\${SBOM_RELATION_LIST}
+		}
+\${SBOM_CONTENT}
 	]
 }"
 	)
@@ -1258,6 +1255,16 @@ _sbom_cmakelist_to_printable_list(\"SBOM_PACKAGE_LIST\")
 _sbom_cmakelist_to_printable_list(\"SBOM_PACKAGE_CONTENT_LIST\")
 _sbom_cmakelist_to_printable_list(\"SBOM_LICENSE_LIST\")
 _sbom_cmakelist_to_printable_list(\"SBOM_RELATION_LIST\")
+
+set(SBOM_CONTENT \"\")
+
+set(CONTENT_LIST \"\${SBOM_PACKAGE_LIST}\" \"\${SBOM_PACKAGE_CONTENT_LIST}\" \"\${SBOM_LICENSE_LIST}\" \"\${SBOM_RELATION_LIST}\")
+
+foreach(var IN LISTS CONTENT_LIST)
+	if(NOT \"\${var}\" STREQUAL \"\")
+		string(APPEND SBOM_CONTENT \",\\n\${var}\")
+	endif()
+endforeach()
 
 configure_file(\"\${SBOM_INTERMEDIATE_FILE}\" \"\${SBOM_EXPORT_FILENAME}\")
 "
