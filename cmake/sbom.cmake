@@ -278,7 +278,7 @@ endmacro()
 #       SBOM_LAST_SPDXID will contain the full URI, while SBOM_LAST_SPDXID_PATH
 #       will contain the path part without the generic uri prefix for use in filepaths.
 function(_sbom_gen_spdxid)
-	cmake_parse_arguments(_arg "" "SCOPE;VARIABLE" "" ${ARGN})
+	cmake_parse_arguments(_arg "ALLOW_DUPLICATES" "SCOPE;VARIABLE" "" ${ARGN})
 
 	if(_arg_UNPARSED_ARGUMENTS)
 		_sbom_log(FATAL_ERROR "Unknown arguments for _sbom_gen_spdxid: ${_arg_UNPARSED_ARGUMENTS}.")
@@ -295,8 +295,26 @@ function(_sbom_gen_spdxid)
 	endif()
 	set(SBOM_LAST_SPDXID "${prefix}/${tmp}")
 	set(SBOM_LAST_SPDXID_PATH "${tmp}")
+
+	get_property(_generated_spdxids GLOBAL PROPERTY SBOM_SPDXID_IDS)
+
+	list(FIND _generated_spdxids "${SBOM_LAST_SPDXID}" _index)
+
+	if(_index GREATER -1)
+		if(NOT DEFINED _arg_ALLOW_DUPLICATES)
+			_sbom_log(
+				FATAL_ERROR
+				"Unable to generate unique SPDX-ID. <${SBOM_LAST_SPDXID}> has already been used for another SBOM element."
+			)
+		endif()
+	else()
+		list(APPEND _generated_spdxids "${SBOM_LAST_SPDXID}")
+		set_property(GLOBAL PROPERTY SBOM_SPDXID_IDS "${_generated_spdxids}")
+	endif()
+
 	_sbom_propagate_spdxid_to_parentscope()
 endfunction()
+
 
 function(_sbom_serialize_package_dates package_dates out_var)
 	set(oneValueArgs "BUILT;RELEASE;VALID_UNTIL")
@@ -474,6 +492,7 @@ function(_sbom_serialize_license_entry)
 	_sbom_gen_spdxid(
 		VARIABLE "${_arg_LICENSE_ID}"
 		SCOPE "License"
+		ALLOW_DUPLICATES
 	)
 
 	set(properties "")
@@ -599,11 +618,6 @@ macro(_sbom_generate_spdx3_template)
 
 	set(_creation_info_property "\"creationInfo\":\"_:creationInfo\"")
 
-	_sbom_gen_spdxid(
-		VARIABLE "${_creator_type}-${_creator_name}"
-		SCOPE "Agent"
-	)
-	set(_creation_creator_id "${SBOM_LAST_SPDXID}")
 	_sbom_gen_spdxid( SCOPE "Document")
 	set(_spdx_document_id "${SBOM_LAST_SPDXID}")
 	_sbom_gen_spdxid( SCOPE "Package")
@@ -658,7 +672,7 @@ macro(_sbom_generate_spdx3_template)
 
 	set(_sbom_doc_elem_list
 		"${_spdx_software_sbom_id}"
-		"${_creation_creator_id}"
+		"${_sbom_gen_creator_spdxid}"
 	)
 
 	set(_sbom_software_pkg_elem_list
@@ -713,7 +727,7 @@ macro(_sbom_generate_spdx3_template)
 			\"software_downloadLocation\": \"${_arg_sbom_gen_PACKAGE_DOWNLOAD}\",
 			\"builtTime\": \"\${SBOM_CREATE_DATE}\",
 			\"originatedBy\": [
-				\"${_creation_creator_id}\"
+				\"${_sbom_gen_creator_spdxid}\"
 			],
 			\"software_copyrightText\": \"${_arg_sbom_gen_PACKAGE_COPYRIGHT}\",
 			${_sbom_gen_pkg_notes_genex}
@@ -1305,16 +1319,18 @@ function(_sbom_add_pkg_content PATH)
 	endif()
 
 	_sbom_gen_spdxid(
-		VARIABLE "File/${PATH}"
-		SCOPE "Package"
+		VARIABLE "${PATH}"
+		SCOPE "File"
 	)
 
 	set(_properties "")
 
 	set(filekind "file")
-	if(_arg_add_pkg_content_DIR)
-		set(filekind "directory")
-	endif()
+	# let's keep compatibility with old behavior of sbom_add_file and sbom_add_directory
+
+	#if(_arg_add_pkg_content_DIR)
+	#	set(filekind "directory")
+	#endif()
 
 	set(_hash_algo "SHA1;SHA256") # SHA1 is always required by SPDX, SHA256 required by TR-03183
 	if(DEFINED _arg_add_pkg_content_CHECKSUM)
@@ -1379,14 +1395,12 @@ if((NOT ADDING_DIR) AND (NOT EXISTS \${CMAKE_INSTALL_PREFIX}/${PATH}))
 	endif()
 endif()
 
-set(_count 0)
 foreach(_f IN LISTS _files)
 	set(file_entry \"\${properties}\")
 
 	set(_id \"${SBOM_LAST_SPDXID}\")
 	if(ADDING_DIR)
-		set(_id \"${SBOM_LAST_SPDXID}-\${_count}\")
-		math(EXPR _count \"\${_count} + 1\")
+		set(_id \"${SBOM_LAST_SPDXID}/\${_f}\")
 	endif()
 
 	list(PREPEND file_entry
