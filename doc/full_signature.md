@@ -103,7 +103,6 @@ sbom_generate(
 sbom_add_[file|directory|target](
 	<filename|path|target>
 	[LICENSE <SPDX License Expression> [COMMENT <comment_text>]]
-	[SPDXID <id>]
 	[RELATIONSHIP <string>...]
 	[FILETYPE <SOURCE|BINARY|ARCHIVE|APPLICATION|AUDIO|IMAGE|TEXT|VIDEO|DOCUMENTATION|SPDX|OTHER>...]
 	[CHECKSUM <MD5|SHA224|SHA256|SHA386|SHA512|SHA3_256|SHA3_384|SHA3_512>...]
@@ -125,10 +124,6 @@ sbom_add_[file|directory|target](
   - If you are adding a target or file from one of your dependencies, specify their license.
     - Optionally, add `COMMENT` to record any additional information that went in to arriving at the concluded license.
       - See [SPDX clause 8.7](https://spdx.github.io/spdx-spec/v2.3/file-information/#87-comments-on-license-field) for more information.
-- `SPDXID`: The ID to use for identifier generation.
-  - If omitted generates a new one.
-  - See [SPDX clause 8.2](https://spdx.github.io/spdx-spec/v2.3/file-information/#82-file-spdx-identifier-field) for more information.
-  - Whether or not this is specified, the variable `SBOM_LAST_SPDXID` is set to just generated/used SPDXID, which could be used for later relationship definitions.
 - `RELATIONSHIP`: An array of relationship definitions related to this package.
   - If omitted a default relationship is added: `SPDXRef-${PACKAGE_NAME} CONTAINS @SBOM_LAST_SPDXID@`
     - `${PACKAGE_NAME}` is the `PACKAGE_NAME` argument given to `sbom_generate()`.
@@ -180,7 +175,6 @@ sbom_add_package(
 	        [COMMENT <comment_text> ]
 	VERSION <version_string>
 	SUPPLIER <PERSON|ORGANIZATION> <name> [EMAIL <email>]
-	[SPDXID <id>]
 	[RELATIONSHIP <string>...]
 	[FILENAME <filename>]
 	[ORIGINATOR <NOASSERTION|PERSON|ORGANIZATION> <name> [EMAIL <email>]]
@@ -234,8 +228,6 @@ sbom_add_package(
     - `sbom_add_package(... SUPPLIER ORGANIZATION "Package Distributor" EMAIL "contact@email.com" ...)`
     - `sbom_add_package(... SUPPLIER PERSON "Firstname Lastname" ...)`
   - See [SPDX clause 7.5](https://spdx.github.io/spdx-spec/v2.3/package-information/#75-package-supplier-field) for more information.
-- `SPDXID`: The ID to use for identifier generation. (spdx clause 7.2)
-  - By default, generate a new one. Whether or not this is specified, the variable `SBOM_LAST_SPDXID` is set to just generated/used SPDXID, which could be used for later relationship definitions.
 - `RELATIONSHIP`: An array of relationship definitions related to this package.
   - If omitted default relationships are added:
     - `SPDXRef-${PACKAGE_NAME} DEPENDS_ON @SBOM_LAST_SPDXID@`

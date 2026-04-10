@@ -4,14 +4,18 @@ Generating SPDX Software Bill of Materials (SBOMs) for arbitrary CMake projects.
 
 The CMake-SBOM-Builder aims to be compliant with:
 
-- [Technical Guideline TR-03183](https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Publications/TechGuidelines/TR03183/BSI-TR-03183-2.pdf?__blob=publicationFile&v=5) of the German Federal Office for Information Security (BSI)
-- The US [Executive Order 14028](https://www.nist.gov/itl/executive-order-14028-improving-nations-cybersecurity/software-security-supply-chains-software-1)
-- [SPDX Specification 2.3](https://spdx.github.io/spdx-spec/v2.3/)
+- [Technical Guideline TR-03183](https://www.bsi.bund.de/dok/TR-03183-en) of the German Federal Office for Information Security (BSI)
+- [SPDX Specification 3.0](https://spdx.github.io/spdx-spec/v3.0/)
 
 The SBOM-Builder is designed to seamlessly be integrated into your CMake project.  It generates a single SBOM for your project, based on the files you install and the package dependencies you specify.
 It also comes with a version extraction feature, to generate version information from your Git repository and make it available in your CMake files, your C/C++ code via a cmake target, and in your shell environment via a script.
 
 To get started, take a look at the [example](#example) and how to [add the SBOM-Builder to your project](#adding-sbom-builder-to-your-project).
+
+## Important note on SPDX 3.0
+
+The SBOM-Builder now targets **SPDX 3.0.1** and generates JSON-LD output. SPDX 2.3 support has been removed.
+Some parameters and features (e.g., `EXTREF`, `CHECKSUM` for packages, `PURPOSE`) are not yet fully serialized in the SPDX 3.0 output and will be addressed in future releases.
 
 ---
 
@@ -25,7 +29,7 @@ Major Changes include:
 - **Single-File Integration**: We condensed everything into a single file to facilitate integration with CMake's `file` command, making it simpler and more efficient to use.
 - **Multi Config Generator Enhancements**: The SBOM generation better integrates with multi-config generators like Visual Studio and Ninja Multi-Config. Different SBOM's are generated for each configuration.
 - **Modernized CMake**: A higher minimum required version (>=3.16), ensuring better compatibility and taking advantage of newer functionalities.
-- **Wider support for SPDX 2.3**: More SPDX fields are supported for better compliance with the SPDX 2.3 specification.
+- **Support for SPDX 3.0**
 - **Compliance with BSI-Guidelines**
 - **Improved Documentation**
 
@@ -44,11 +48,9 @@ Major Changes include:
 	- [`sbom_add_package`](#sbom_add_package)
 	- [`sbom_add_external`](#sbom_add_external)
 	- [`sbom_finalize`](#sbom_finalize)
-	- [`sbom_spdxid`](#sbom_spdxid)
 - [Version Extraction](#version-extraction)
 	- [`version_extract()`](#version_extract)
 	- [`version_generate()`](#version_generate)
-- [Compatibility Strategy](#compatibility-strategy)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
 
@@ -110,12 +112,12 @@ cmake --install build --config {Debug,Release,...} --prefix build/install/{Debug
 We recommend using the `--prefix` option to override the install prefix, when using multi-config generators. This allows the SBOM to be generated in different locations for each configuration.
 If you don't use the `--prefix` option, the SBOM will be generated in the same location for all configurations, overwriting each other.
 
-Per default the SBOM will be generated in `${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}-sbom-${GIT_VERSION_PATH}.spdx` (see also CMake output).
+Per default the SBOM will be generated in `${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}-sbom-${GIT_VERSION_PATH}.spdx.json` (see also CMake output).
 
 ```text
--- Installing: .../build/install/share/example-sbom-0.2.1.spdx
+-- Installing: .../build/install/share/example-sbom-0.2.1.spdx.json
 ...
--- Finalizing: .../build/install/share/example-sbom-0.2.1.spdx
+-- Finalizing: .../build/install/share/example-sbom-0.2.1.spdx.json
 ```
 
 ### Example
@@ -127,7 +129,8 @@ project(Example)
 include(cmake/sbom.cmake)
 
 sbom_generate(
-	SUPPLIER ORGANIZATION "sodgeIT"
+	CREATOR ORGANIZATION "sodgeIT"
+	PACKAGE_URL "https://example.com"
 	PACKAGE_NAME "Example"
 	PACKAGE_VERSION "1.0.0"
 	PACKAGE_LICENSE "MIT"
@@ -157,7 +160,7 @@ target_link_libraries(cli PRIVATE example_lib cxxopts)
 
 install(TARGETS cli	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(TARGETS example_lib LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(FILE header1.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES header1.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 sbom_add_target(cli)
 sbom_add_target(example_lib)
@@ -171,7 +174,7 @@ sbom_finalize()
 ## Available Functions and Arguments
 
 Here is a brief overview of the functions provided by the SBOM-Builder. Shown here is only a subset of the available arguments, which we consider the most important and most likely to be used.
-For the entire function signature take a look [here](./doc/full_signature.md).
+For the entire function signature take a look [here](./doc/full_signature.md) (note: the full signature document still references SPDX 2.3 and is being updated).
 
 ### `sbom_generate`
 
@@ -181,20 +184,50 @@ sbom_generate(
 	PACKAGE_LICENSE <SPDX License Expression>
 	[PACKAGE_NAME <package_name>]
 	[PACKAGE_VERSION <version_string>]
+	[PACKAGE_URL <url>]
+	[PACKAGE_DOWNLOAD <NOASSERTION|NONE|<url>>]
 	[PACKAGE_COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
+	[PACKAGE_NOTES [SUMMARY <summary_text>] [DESC <description_text>]]
+	[PACKAGE_PURPOSE <APPLICATION|FRAMEWORK|LIBRARY|CONTAINER|
+	                  OPERATING-SYSTEM|DEVICE|FIRMWARE|SOURCE|
+	                  ARCHIVE|FILE|INSTALL|OTHER>]
+	[PACKAGE_CPE <cpe_string>]
+	[OUTPUT <filename>]
+	[NAMESPACE <URI>]
 )
 ```
 
-- `CREATOR`: Supplier of the Package and Creator of the sbom
-  - One of the `<PERSON|ORGANIZATION>` keywords must be provided.
+- `CREATOR`: Supplier of the package and creator of the SBOM.
+  - One of the `<PERSON|ORGANIZATION>` keywords must be provided, followed by a name.
   - `EMAIL` is optional.
+  - The SBOM-Builder is always added as an additional creator tool.
 - `PACKAGE_LICENSE`: License of the package described in the SBOM.
+  - Requires a valid SPDX license expression.
+  - Sets both the declared and concluded license to the same value.
 - `PACKAGE_NAME`: Package name.
   - Defaults to `${PROJECT_NAME}`.
-- `PACKAGE_VERSION`: Package version field
+- `PACKAGE_VERSION`: Package version field.
   - Defaults to `${GIT_VERSION}`. (see [Version Extraction](#version-extraction))
+- `PACKAGE_URL`: Package home page URL.
+  - When `NAMESPACE` is omitted, this is used to derive the document namespace.
+  - Either `PACKAGE_URL` or `NAMESPACE` must be provided.
+- `PACKAGE_DOWNLOAD`: Download location of the distributed package.
+  - Either `NOASSERTION`, `NONE`, or a URL.
+  - Defaults to `NOASSERTION`.
 - `PACKAGE_COPYRIGHT`: Copyright information.
+  - Either `NOASSERTION`, `NONE`, or a copyright text.
   - Defaults to `<year> <name>` where `<name>` is the `CREATOR` name.
+- `PACKAGE_NOTES`: Optional descriptive text for the package.
+  - `SUMMARY`: A short description.
+  - `DESC`: A detailed description.
+- `PACKAGE_PURPOSE`: Primary purpose of the package.
+  - One of `APPLICATION`, `FRAMEWORK`, `LIBRARY`, `CONTAINER`, `OPERATING-SYSTEM`, `DEVICE`, `FIRMWARE`, `SOURCE`, `ARCHIVE`, `FILE`, `INSTALL`, `OTHER`.
+- `PACKAGE_CPE`: Optional CPE string describing the package (not validated).
+- `OUTPUT`: Output filename and path for the generated SBOM.
+  - Can be absolute or relative to `CMAKE_INSTALL_PREFIX`.
+  - Defaults to `${CMAKE_INSTALL_PREFIX}/share/${PACKAGE_NAME}-sbom-${GIT_VERSION_PATH}.spdx.json`.
+- `NAMESPACE`: Document namespace URI.
+  - If not specified, defaults to a URL based on `PACKAGE_URL`, `PACKAGE_NAME`, and `PACKAGE_VERSION`.
 
 ### `sbom_add_[file|directory|target]`
 
@@ -203,62 +236,93 @@ sbom_add_[file|directory|target](
 	<filename|path|target>
 	[LICENSE <SPDX License Expression>]
 	[COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
+	[FILETYPE <SOURCE|BINARY|ARCHIVE|APPLICATION|AUDIO|
+	           IMAGE|TEXT|VIDEO|DOCUMENTATION|SPDX|OTHER>...]
+	[CHECKSUM <MD5|SHA224|SHA384|SHA512|SHA3-256|SHA3-384|SHA3-512>...]
+	[COMMENT <comment_text>]
 	[RELATIONSHIP <string>...]
 )
 ```
 
 - `filename|path|target`:
-  - A path to a file/directory, relative to `CMAKE_INSTALL_PREFIX`, or a target name, to be added to the SBOM. Target have to be installed using `install(TARGETS ...)`.
+  - A path to a file/directory, relative to `CMAKE_INSTALL_PREFIX`, or a target name, to be added to the SBOM. Targets have to be installed using `install(TARGETS ...)`.
   - Generator expressions are supported.
+  - For targets, the install location is automatically determined based on the target type (executable, static library, or shared library).
 - `LICENSE`: License of the file.
-  - Defaults to the license of the package. (`PACKAGE_LICENSE` from `sbom_generate()`)
+  - Defaults to the license of the package (`PACKAGE_LICENSE` from `sbom_generate()`).
   - If you are adding a target or file from one of your dependencies, specify their license.
-    - Check the full signature for more information in such cases.
-- `COPYRIGHT`:
-  - Defaults to the copyright of the package. (`PACKAGE_COPYRIGHT` from `sbom_generate()`)
-  - If you are adding a target or file from one of your dependencies, specify thier copyright text.
+- `COPYRIGHT`: Copyright information.
+  - Defaults to the copyright of the package (`PACKAGE_COPYRIGHT` from `sbom_generate()`).
+  - If you are adding a target or file from one of your dependencies, specify their copyright text.
     - Use `NOASSERTION` or `NONE` if the information cannot be determined or is not specified.
+- `FILETYPE`: One or more file type indicators.
+  - If omitted, no file type entry is generated.
+  - One or more of: `SOURCE`, `BINARY`, `ARCHIVE`, `APPLICATION`, `AUDIO`, `IMAGE`, `TEXT`, `VIDEO`, `DOCUMENTATION`, `SPDX`, `OTHER`.
+  - For `sbom_add_target()`, `BINARY` is added automatically.
+- `CHECKSUM`: Additional checksum algorithms to generate.
+  - SHA1 and SHA256 are always generated automatically (required by SPDX and TR-03183).
+  - Use this to request additional checksums: `MD5`, `SHA224`, `SHA384`, `SHA512`, `SHA3-256`, `SHA3-384`, `SHA3-512`.
+- `COMMENT`: Additional comments about the file.
 - `RELATIONSHIP`:
-  - One or more strings describing the relationship between sbom components
-  - Defaults to `<project_id> CONTAINS <id>`
-    - `<project_id>` and `<id>`are placeholders for the SPDX identifiers that are automatically generated.
-  - Use this argument to override the default relationship. See [SPDX clause 11](https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/) for more information.
+  - One or more strings describing the relationship between SBOM components.
+  - Defaults to a `CONTAINS` relationship from the project package to this item.
+  - The string `@SBOM_LAST_SPDXID@` will be replaced by the SPDX identifier generated for this item.
 
 ### `sbom_add_package`
 
 ```cmake
 sbom_add_package(
 	<name>
-	LICENSE <SPDX License Expression>
+	LICENSE <SPDX License Expression> [DECLARED <SPDX License Expression>] [COMMENT <text>]
 	VERSION <version_string>
 	SUPPLIER <PERSON|ORGANIZATION> <name> [EMAIL <email>]
+	[COPYRIGHT <NOASSERTION|NONE|<copyright_text>>]
+	[DOWNLOAD <NOASSERTION|NONE|<url>>]
+	[URL <url>]
+	[SOURCE_INFO <text>]
+	[NOTES [SUMMARY <summary_text>] [DESC <description_text>] [COMMENT <comment_text>]]
+	[ATTRIBUTION <text>...]
 	[RELATIONSHIP <string>...]
 	...
 )
 ```
 
 - `name`: The name of the package.
-- `LICENSE`: License of the package.
-  - Check the full signature for more information, if the license is not specified, cannot be determined, or contains exceptions.
+  - Use the name given by the author or package manager.
+  - The package is treated as a black box; its files are not analysed.
+- `LICENSE`: Concluded license of the package.
+  - Requires a valid SPDX license expression.
+  - `DECLARED`: Optionally specify the license declared by the package supplier, if it differs from the concluded license. Defaults to `NOASSERTION`.
+  - `COMMENT`: Optionally record additional information about how the concluded license was determined.
 - `VERSION`: Version of the package.
 - `SUPPLIER`: Supplier of the package.
-  - One of the `<PERSON|ORGANIZATION>` keywords must be provided.
+  - One of the `<PERSON|ORGANIZATION>` keywords must be provided, followed by a name.
   - `EMAIL` is optional.
+- `COPYRIGHT`: Copyright information.
+  - Either `NOASSERTION`, `NONE`, or a copyright text.
+  - Defaults to `NOASSERTION`.
+- `DOWNLOAD`: Download location of the package.
+  - Either `NOASSERTION`, `NONE`, or a URL.
+  - Defaults to `NOASSERTION`.
+- `URL`: Package home page URL.
+- `SOURCE_INFO`: Background information about the origin of the package.
+- `NOTES`: Optional descriptive text for the package.
+  - `SUMMARY`: A short description.
+  - `DESC`: A detailed description.
+  - `COMMENT`: Additional comments.
+- `ATTRIBUTION`: One or more attribution text strings.
 - `RELATIONSHIP`:
-  - One or more strings describing the relationship between sbom components
-  - Defaults to:
-    - `<project> DEPENDS_ON <this_sbom_item>`
-    - `<this_sbom_item> CONTAINS NOASSERTION`.
-      - `<project>` and `<this_sbom_item>`are placeholders for the SPDX identifiers that are automatically generated.
-  - Use this argument to override the default relationship. See [SPDX clause 11](https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/) for more information.
-  - Eg: In the example below, the dependency `cxxopts` is only used by the `cli` and not the entire package.  The relationship can be overridden as follows:
+  - One or more strings describing the relationship between SBOM components.
+  - Defaults to a `DEPENDS_ON` relationship from the project package to this dependency.
+  - The string `@SBOM_LAST_SPDXID@` will be replaced by the SPDX identifier generated for this package.
+  - Use this argument to override the default relationship. E.g., declare that only specific targets depend on a package:
   ```cmake
   sbom_add_target(cli)
   set(cli_spdxid ${SBOM_LAST_SPDXID})
   sbom_add_package(cxxopts ... RELATIONSHIP "${cli_spdxid} DEPENDS_ON @SBOM_LAST_SPDXID@" )
   ```
-  - - `${SBOM_LAST_SPDXID}` is set to the SPDX identifier of the last added file/package/target.
-    - `@SBOM_LAST_SPDXID@` is a placeholder for the SPDX identifier that will be generated for `cxxopts` in the call to `sbom_add_package`.
+  - `${SBOM_LAST_SPDXID}` is set to the SPDX identifier of the last added file/package/target.
+  - `@SBOM_LAST_SPDXID@` is a placeholder for the SPDX identifier that will be generated for `cxxopts` in the call to `sbom_add_package`.
 
 ### `sbom_add_external`
 
@@ -288,25 +352,6 @@ Finalize the SBOM.
 ```cmake
 sbom_finalize()
 ```
-
-### `sbom_spdxid`
-
-***This should rarely be used directly.*** All sbom_add_* functions will use this function to automatically generate unique SPDX identifiers.
-
-Generate a unique SPDX identifier.
-
-```cmake
-sbom_spdxid(
-   VARIABLE <variable_name>
-   [CHECK <id> | HINTS <hint>...]
-)
-```
-
-- `VARIABLE`: The output variable to generate a unique SDPX identifier in.
-- `CHECK`: Verify and return the given identifier.
-- `HINTS`: One or more hints, which are converted into a valid identifier. The first non-empty hint is used. If no hint is specified, a unique identifier is returned, with unspecified format.
-
----
 
 ## Version Extraction
 
@@ -350,18 +395,6 @@ This function generates the following files, containing the above-mentioned vari
   - Link the target `${PROJECT_NAME}-version` and include `${PROJECT_NAME}-version.h` to access the version information in C/C++. [(example)](example/CMakeLists.txt).
 
 All files are generated in `${PROJECT_BINARY_DIR}/version/[scripts|include|doc]`. The CMake variables `VERSION_SCRIPT_DIR`, `VERSION_INC_DIR`, and `VERSION_DOC_DIR` point to these directories.
-
----
-
-## Compatibility Strategy
-
-CMake frequently releases new features and improvements, and sometimes deprecates or supersedes old features. To ensure our script remains functional and takes advantage of these updates, we will update our minimum required CMake version in line with the oldest supported Ubuntu LTS release.
-
-As of the time of writing, the oldest supported Ubuntu LTS release is Ubuntu 20.04, which includes CMake version 3.16. When support for Ubuntu 20.04 is dropped in May 2025, we will update our minimum required to align with the next oldest supported Ubuntu LTS release. (Ubuntu 22.04, which includes CMake version 3.22)
-
-Our testing strategy will also be aligned with this approach.
-
-We believe this approach strikes a balance between ensuring broad compatibility for users on stable and long-term platforms and leveraging updated features and improvements in CMake.
 
 ---
 

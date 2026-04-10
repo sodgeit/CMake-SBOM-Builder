@@ -15,20 +15,8 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 	set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/install" CACHE PATH "" FORCE)
 endif()
 
-
-# This example uses CPM to download dependencies. This is not required for SBOM generation,
-# but for a simple example like this, it allows us to build the project without any dependencies.
-file(
-	DOWNLOAD
-	https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.40.2/CPM.cmake
-	${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake
-	EXPECTED_HASH SHA256=c8cdc32c03816538ce22781ed72964dc864b2a34a310d3b7104812a5ca2d835d
-)
-include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
-
-
 # Include the SBOM.cmake file to generate the SBOM.
-include(../cmake/sbom.cmake)
+include(sbom)
 
 # Now we can start building the sbom.
 # This is the only required call to generate the SBOM. It has to be called before any other
@@ -43,26 +31,23 @@ sbom_generate(
 )
 
 # mention the dependencies used in the SBOM
-CPMAddPackage( "gh:jarro2783/cxxopts@3.2.0" )
+sbom_add_package(
+	some_dep
+	VERSION 1.1.1
+	SUPPLIER PERSON "example person"
+	LICENSE LGPL3.0
+)
 sbom_add_package(
 	cxxopts
 	VERSION 3.2.0
 	SUPPLIER PERSON "Jarryd Beck"
 	LICENSE MIT
 )
-
-CPMAddPackage(
-	NAME Boost
-	VERSION 1.85.0
-	URL https://github.com/boostorg/boost/releases/download/boost-1.85.0/boost-1.85.0-cmake.tar.gz
-	URL_HASH SHA256=ab9c9c4797384b0949dd676cf86b4f99553f8c148d767485aaac412af25183e6
-	OPTIONS "BOOST_INCLUDE_LIBRARIES algorithm"
-)
 sbom_add_package(
-	Boost
-	VERSION "1.85.0"
-	SUPPLIER ORGANIZATION "Boost Foundation"
-	LICENSE BSL-1.0
+	nlohmann_json
+	VERSION 3.12.0
+	SUPPLIER PERSON "Niels Lohmann"
+	LICENSE MIT
 )
 
 # The SBOM-Builder does not have a built-in feature to add
@@ -85,8 +70,9 @@ version_generate()
 target_link_libraries(example
 	PRIVATE
 	${PROJECT_NAME}-version # this is the generated version target
-	cxxopts
-	Boost::algorithm
+	# not installed just for SBOM demonstration
+	#cxxopts
+	#nlohmann_json
 )
 
 # Now mention all files that would be contained in a distributed archive/package.
