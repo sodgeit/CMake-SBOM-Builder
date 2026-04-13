@@ -192,7 +192,7 @@ sbom_add_package(
 	[NOTES [SUMMARY <summary_text>]
 	       [DESC <summary_text>]
 		   [COMMENT <summary_text>] ]
-	[EXTREF <<SECURITY|PACKAGE_MANAGER|PERSISTENT-ID|OTHER> <type> <locator> [COMMENT <comment_text>]>...]
+	[EXTREF <<SECURITY|PACKAGE-MANAGER|PERSISTENT-ID|OTHER> <type> <locator> [COMMENT <comment_text>]>...]
 	[ATTRIBUTION <attribution_text>...]
 	[PURPOSE <APPLICATION|FRAMEWORK|LIBRARY|
 			  CONTAINER|OPERATING-SYSTEM|DEVICE|

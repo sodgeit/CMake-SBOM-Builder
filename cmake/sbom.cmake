@@ -519,6 +519,55 @@ function(_sbom_parse_filetype file_type_arg out_filetype_list)
 	set(${out_filetype_list} "${${out_filetype_list}}" PARENT_SCOPE)
 endfunction()
 
+function(_sbom_parse_extref extref_list out_fields)
+	set(_valid_categories "SECURITY" "PACKAGE-MANAGER" "PERSISTENT-ID" "OTHER")
+	set(_result "")
+	list(LENGTH extref_list _len)
+
+	set(_i 0)
+	while(_i LESS _len)
+		# expect: <category> <type> <locator> [COMMENT <text>]
+		list(GET extref_list ${_i} _category)
+		math(EXPR _i "${_i} + 1")
+
+		if(NOT "${_category}" IN_LIST _valid_categories)
+			message(FATAL_ERROR "Invalid EXTREF category \"${_category}\". Expected one of: ${_valid_categories}")
+		endif()
+
+		# type
+		if(NOT _i LESS _len)
+			message(FATAL_ERROR "Missing <type> after EXTREF category \"${_category}\".")
+		endif()
+		list(GET extref_list ${_i} _type)
+		math(EXPR _i "${_i} + 1")
+
+		# locator
+		if(NOT _i LESS _len)
+			message(FATAL_ERROR "Missing <locator> after EXTREF type \"${_type}\".")
+		endif()
+		list(GET extref_list ${_i} _locator)
+		math(EXPR _i "${_i} + 1")
+
+		string(APPEND _result "\nExternalRef: ${_category} ${_type} ${_locator}")
+
+		# optional COMMENT
+		if(_i LESS _len)
+			list(GET extref_list ${_i} _next)
+			if("${_next}" STREQUAL "COMMENT")
+				math(EXPR _i "${_i} + 1")
+				if(NOT _i LESS _len)
+					message(FATAL_ERROR "Missing text after EXTREF COMMENT keyword.")
+				endif()
+				list(GET extref_list ${_i} _comment_text)
+				math(EXPR _i "${_i} + 1")
+				string(APPEND _result "\nExternalRefComment: <text>${_comment_text}</text>")
+			endif()
+		endif()
+	endwhile()
+
+	set(${out_fields} "${_result}" PARENT_SCOPE)
+endfunction()
+
 # Starts SBOM generation. Call sbom_add() and friends afterwards. End with sbom_finalize(). Input
 # files allow having variables and generator expressions.
 function(sbom_generate)
@@ -1098,9 +1147,10 @@ function(sbom_add_package NAME)
 		endif()
 	endif()
 
-	foreach(_ref IN LISTS _arg_add_pkg_EXTREF)
-		string(APPEND _fields "\nExternalRef: ${_ref}")
-	endforeach()
+	if(DEFINED _arg_add_pkg_EXTREF)
+		_sbom_parse_extref("${_arg_add_pkg_EXTREF}" _extref_fields)
+		string(APPEND _fields "${_extref_fields}")
+	endif()
 
 	if(DEFINED _arg_add_pkg_ATTRIBUTION)
 		foreach(_attr IN LISTS _arg_add_pkg_ATTRIBUTION)
